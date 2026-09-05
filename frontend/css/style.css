@@ -1236,3 +1236,36 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior:auto !important; animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; } }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 .shop-toolbar select { min-height:42px; padding:0 14px; border:1px solid var(--border); border-radius:10px; background:var(--surface-solid); color:var(--text); }
+
+/* Mobile layout corrections using the existing design tokens. */
+html { overflow-x: hidden; }
+body { overflow-x: hidden; }
+.shop-image { overflow: hidden; }
+.shop-image img { width:100%; height:100%; object-fit:cover; display:block; }
+.thumbs img { cursor:pointer; }
+@media (max-width: 800px) {
+  .nav { padding: 14px 18px; gap: 12px; }
+  .nav-links { gap: 14px; }
+  .nav-links a { font-size: .82rem; }
+  .product-detail, .grid-2, .contact-grid { grid-template-columns: 1fr; gap: 28px; }
+  .product-detail { padding-top: 20px; }
+  .product-detail h1 { font-size: 2rem !important; }
+  .product-gallery { position: static; }
+  .contact-form, .contact-info { padding: 26px !important; }
+}
+@media (max-width: 600px) {
+  .nav-links { display: none; }
+  .nav .btn { margin-left: auto; padding: 9px 12px !important; font-size: .72rem !important; }
+  .section { padding-left: 18px; padding-right: 18px; }
+  .section[style*="padding-top"] { padding-top: 110px !important; }
+  .hero h1 { font-size: clamp(2.3rem, 12vw, 4rem); }
+  .hero-content { padding-left: 18px; padding-right: 18px; }
+  .hero-buttons { flex-direction: column; align-items: stretch; }
+  .hero-buttons .btn { justify-content: center; }
+  .product-detail h1 { font-size: 1.75rem !important; }
+  .cart-item { gap: 12px; padding: 14px; }
+  .cart-item img { width: 56px; height: 56px; }
+  .cart-item-actions { gap: 8px; }
+  .cart-item-actions button { min-width: 34px; min-height: 34px; }
+  .contact-item { align-items: flex-start; }
+}
