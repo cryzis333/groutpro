@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Магазин — ГраутПро</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="nav glass">
+    <a href="index.html" class="nav-logo">Граут<span>Про</span></a>
+    <ul class="nav-links">
+      <li><a href="index.html">Главная</a></li>
+      <li><a href="shop.html">Магазин</a></li>
+      <li><a href="index.html#contact">Контакты</a></li>
+    </ul>
+    <a href="cart.html" class="btn btn-secondary" style="padding:10px 20px;font-size:0.8rem">🛒 Корзина</a>
+    <button class="theme-toggle" id="themeToggle" aria-label="Переключить тему">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </nav>
+
+  <section class="section" style="padding-top:140px">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-label">Каталог</div>
+        <h2>Товары и <span style="color:var(--accent)">услуги</span></h2>
+        <p class="lead">Профессиональные материалы и оборудование для инъектирования бетона.</p>
+      </div>
+      <div class="shop-grid" id="shop-grid">
+        <p style="text-align:center;color:var(--muted);grid-column:1/-1">Загрузка каталога...</p>
+      </div>
+    </div>
+  </section>
+
+  <script src="js/main.js"></script>
+  <script src="js/shop.js"></script>
+</body>
+</html>

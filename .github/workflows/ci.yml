@@ -1,0 +1,32 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo test
+      - name: Check JavaScript syntax
+        working-directory: .
+        run: for file in frontend/js/*.js; do node --check "$file"; done
+      - name: Reject committed secrets
+        working-directory: .
+        run: |
+          test ! -f .env
+          test ! -f backend/.env
+          ! git grep -nE -- 'BEGIN (OPENSSH|RSA|EC) PRIVATE KEY|YOOKASSA_SECRET_KEY=[^[:space:]]+|SMTP_PASSWORD=[^[:space:]]+' -- ':!*.example' ':!.github/workflows/ci.yml'

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Товар — ГраутПро</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="nav glass">
+    <a href="index.html" class="nav-logo">Граут<span>Про</span></a>
+    <ul class="nav-links">
+      <li><a href="shop.html">← Назад в каталог</a></li>
+    </ul>
+    <a href="cart.html" class="btn btn-secondary" style="padding:10px 20px;font-size:0.8rem">🛒 Корзина</a>
+    <button class="theme-toggle" id="themeToggle" aria-label="Переключить тему">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </nav>
+
+  <section class="section" style="padding-top:140px">
+    <div class="container">
+      <div class="product-detail reveal">
+        <div class="product-gallery">
+          <img id="prod-main-img" src="" alt="">
+          <div class="thumbs" id="prod-thumbs"></div>
+        </div>
+        <div>
+          <div class="section-label">Товар</div>
+          <h1 id="prod-title" style="font-size:2.5rem;margin-bottom:16px;letter-spacing:-1px">...</h1>
+          <p id="prod-price" style="font-size:2rem;font-weight:900;color:var(--accent);margin-bottom:24px">...</p>
+          <p id="prod-desc" style="color:var(--text-secondary);margin-bottom:24px;line-height:1.7">...</p>
+          <p id="prod-stock" style="color:var(--muted);margin-bottom:32px;font-weight:500">...</p>
+          <button id="add-cart" class="btn btn-primary" style="width:100%;justify-content:center">Добавить в корзину</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script src="js/main.js"></script>
+  <script src="js/product.js"></script>
+</body>
+</html>

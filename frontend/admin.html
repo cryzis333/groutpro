@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Админ-панель — ГраутПро</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar glass-strong">
+      <h2>Граут<span style="color:var(--accent)">Про</span></h2>
+      <nav>
+        <a href="#dashboard" class="active">📊 Аналитика</a>
+        <a href="#products">📦 Товары</a>
+        <a href="#orders">🛒 Заказы</a>
+        <a href="index.html">← На сайт</a>
+      </nav>
+    </aside>
+    <main class="admin-main">
+      <section id="dashboard">
+        <h2 style="margin-bottom:24px;letter-spacing:-1px">Бизнес-аналитика</h2>
+        <div class="stats-row">
+          <div class="stat-card glass">
+            <h3 id="stat-revenue">0 ₽</h3>
+            <p>Выручка (30 дней)</p>
+          </div>
+          <div class="stat-card glass">
+            <h3 id="stat-orders">0</h3>
+            <p>Заказов</p>
+          </div>
+          <div class="stat-card glass">
+            <h3 id="stat-avg">0 ₽</h3>
+            <p>Средний чек</p>
+          </div>
+        </div>
+        <div class="glass" style="padding:24px;border-radius:var(--radius)">
+          <canvas id="revenueChart" height="100"></canvas>
+        </div>
+      </section>
+
+      <section id="products" style="margin-top:64px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:16px">
+          <h2 style="letter-spacing:-1px">Товары</h2>
+          <button id="open-modal" class="btn btn-primary">+ Новый товар</button>
+        </div>
+        <div class="admin-table-wrap glass">
+          <table class="admin-table">
+            <thead>
+              <tr><th>Фото</th><th>Название</th><th>Цена</th><th>Наличие</th><th></th></tr>
+            </thead>
+            <tbody id="products-table"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="orders" style="margin-top:64px">
+        <h2 style="margin-bottom:24px;letter-spacing:-1px">Заказы</h2>
+        <div class="admin-table-wrap glass">
+          <table class="admin-table">
+            <thead>
+              <tr><th>ID</th><th>Клиент</th><th>Сумма</th><th>Статус</th><th>Дата</th></tr>
+            </thead>
+            <tbody id="orders-table"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="product-modal">
+    <div class="modal-content">
+      <button class="modal-close" id="close-modal">×</button>
+      <h3 style="margin-bottom:24px;letter-spacing:-0.5px">Новый товар</h3>
+      <form id="product-form">
+        <div class="form-group">
+          <input type="text" id="p-title" placeholder="Название" required>
+        </div>
+        <div class="form-group">
+          <textarea id="p-desc" placeholder="Описание" style="min-height:80px"></textarea>
+        </div>
+        <div class="form-group">
+          <input type="number" id="p-price" placeholder="Цена в ₽" step="0.01" required>
+        </div>
+        <div class="form-group">
+          <input type="text" id="p-cat" placeholder="Категория">
+        </div>
+        <div class="form-group">
+          <input type="number" id="p-stock" placeholder="Количество" value="1">
+        </div>
+        <div class="drop-zone" id="drop-zone">
+          <p>Перетащите фото сюда или кликните для выбора</p>
+          <p style="font-size:0.75rem;color:var(--muted);margin-top:8px">До 10 изображений. Первое — превью.</p>
+          <input type="file" id="product-images" multiple accept="image/*" style="display:none">
+        </div>
+        <div id="image-preview"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">Создать товар</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>
