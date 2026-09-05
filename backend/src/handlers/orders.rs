@@ -40,11 +40,8 @@ pub async fn persist_order(state: &AppState, req: &CreateOrderRequest) -> Result
         sqlx::query("INSERT INTO order_items (order_id, product_id, product_title, quantity, price) VALUES ($1,$2,$3,$4,$5)")
             .bind(order.id).bind(product.id).bind(&product.title).bind(item.quantity).bind(product.price)
             .execute(&mut *tx).await?;
-        sqlx::query("UPDATE products SET stock = stock - $1, updated_at = NOW() WHERE id = $2")
-            .bind(item.quantity)
-            .bind(product.id)
-            .execute(&mut *tx)
-            .await?;
+        // Stock is reserved only after YooKassa confirms payment. This keeps
+        // abandoned or cancelled payment attempts from consuming inventory.
     }
     tx.commit().await?;
     Ok(order)

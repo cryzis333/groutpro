@@ -24,7 +24,7 @@ pub async fn create_payment(
             order.total_amount,
             &order.id.to_string(),
             &format!("Заказ {}", order.id),
-            &format!("{}/cart.html?success=1", state.config.site_url),
+            &format!("{}/cart?success=1", state.config.site_url),
         )
         .await
         .map_err(AppError::internal)?;
@@ -94,10 +94,27 @@ pub async fn yookassa_webhook(
     if actual != expected || currency != Some("RUB") {
         return Err(AppError::Unauthorized);
     }
-    sqlx::query("UPDATE orders SET status='paid', notified_at=NOW(), updated_at=NOW() WHERE id=$1")
-        .bind(order.id)
+    let items =
+        sqlx::query_as::<_, OrderItem>("SELECT * FROM order_items WHERE order_id=$1 FOR UPDATE")
+            .bind(order.id)
+            .fetch_all(&mut *tx)
+            .await?;
+    for item in &items {
+        let changed = sqlx::query(
+            "UPDATE products SET stock=stock-$1, updated_at=NOW() WHERE id=$2 AND stock >= $1",
+        )
+        .bind(item.quantity)
+        .bind(item.product_id)
         .execute(&mut *tx)
         .await?;
+        if changed.rows_affected() != 1 {
+            return Err(AppError::Validation(
+                "Товар закончился, заказ отменён".into(),
+            ));
+        }
+    }
+    sqlx::query("UPDATE orders SET status='paid', paid_at=NOW(), notified_at=NOW(), updated_at=NOW() WHERE id=$1")
+        .bind(order.id).execute(&mut *tx).await?;
     let items = sqlx::query_as::<_, OrderItem>("SELECT * FROM order_items WHERE order_id=$1")
         .bind(order.id)
         .fetch_all(&mut *tx)
