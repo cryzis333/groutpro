@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', async () => {
-    const id = new URLSearchParams(location.search).get('id');
-    if (!/^[a-f0-9-]{36}$/i.test(id || '')) return location.replace('shop.html');
+    const pathId = location.pathname.match(/^\/product\/([a-f0-9-]{36})$/i)?.[1];
+    const id = pathId || new URLSearchParams(location.search).get('id');
+    if (!/^[a-f0-9-]{36}$/i.test(id || '')) return location.replace('/shop');
     try {
         const response = await fetch(`/api/products/${encodeURIComponent(id)}`);
         if (!response.ok) throw new Error();
