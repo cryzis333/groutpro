@@ -64,6 +64,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/health", get(|| async { "ok" }))
         .route("/api/products", get(handlers::products::list_products))
         .route("/api/products/:id", get(handlers::products::get_product))
+        .route("/api/contact", post(handlers::contact::create_contact))
         .route("/api/orders", post(handlers::orders::create_order))
         .route(
             "/api/payments/create",

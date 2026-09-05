@@ -8,9 +8,9 @@
 </head>
 <body>
   <nav class="nav glass">
-    <a href="index.html" class="nav-logo">Граут<span>Про</span></a>
+    <a href="/" class="nav-logo">Граут<span>Про</span></a>
     <ul class="nav-links">
-      <li><a href="shop.html">← Продолжить покупки</a></li>
+      <li><a href="/shop">← Продолжить покупки</a></li>
     </ul>
     <button class="theme-toggle" id="themeToggle" aria-label="Переключить тему">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -21,25 +21,18 @@
     <div class="container">
       <div class="grid-2">
         <div class="reveal">
-          <h2 style="margin-bottom:32px;letter-spacing:-1px">Корзина</h2>
+          <h1 style="margin-bottom:32px;letter-spacing:-1px">Корзина</h1>
+          <p id="cart-status" role="status" aria-live="polite"></p>
           <div id="cart-items"></div>
           <div class="cart-total" id="cart-total">0.00 ₽</div>
         </div>
         <div class="reveal">
           <form id="checkout-form" class="glass" style="padding:40px;border-radius:24px">
             <h3 style="margin-bottom:24px">Оформление заказа</h3>
-            <div class="form-group">
-              <input type="text" id="name" placeholder="ФИО" required>
-            </div>
-            <div class="form-group">
-              <input type="tel" id="phone" placeholder="Телефон" required>
-            </div>
-            <div class="form-group">
-              <input type="email" id="email" placeholder="Email">
-            </div>
-            <div class="form-group">
-              <textarea id="address" placeholder="Адрес доставки / объект"></textarea>
-            </div>
+            <div class="form-group"><label for="name">Имя</label><input type="text" id="name" autocomplete="name" required maxlength="120"></div>
+            <div class="form-group"><label for="phone">Телефон</label><input type="tel" id="phone" autocomplete="tel" required maxlength="32"></div>
+            <div class="form-group"><label for="email">Email <span>(необязательно)</span></label><input type="email" id="email" autocomplete="email" maxlength="254"></div>
+            <div class="form-group"><label for="address">Адрес доставки или объект</label><textarea id="address" maxlength="1000"></textarea></div>
             <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">Оплатить через СБП</button>
             <p style="font-size:0.75rem;color:var(--muted);text-align:center;margin-top:16px">Платёж обрабатывается ЮKassa. Комиссия за перевод взимается с продавца.</p>
           </form>

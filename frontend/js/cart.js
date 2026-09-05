@@ -1,56 +1,23 @@
-function readCart() {
-    try {
-        const raw = JSON.parse(localStorage.getItem('cart') || '[]');
-        if (!Array.isArray(raw)) throw new Error();
-        return raw.filter(item => /^[a-f0-9-]{36}$/i.test(item.id || '') && Number.isInteger(item.qty) && item.qty > 0 && item.qty <= 100);
-    } catch (_) {
-        localStorage.removeItem('cart');
-        return [];
-    }
-}
-function saveCart(cart) { localStorage.setItem('cart', JSON.stringify(cart)); }
-function safeImageName(value) { return typeof value === 'string' && /^[a-f0-9-]+\.(?:jpg|png|webp)$/i.test(value); }
+let catalog = new Map();
+function readCart() { try { const value=JSON.parse(localStorage.getItem('cart')||'[]'); return Array.isArray(value)?value.filter(i=>/^[a-f0-9-]{36}$/i.test(i.id||'')&&Number.isInteger(i.qty)&&i.qty>0):[]; } catch (_) { return []; } }
+function saveCart(cart) { localStorage.setItem('cart',JSON.stringify(cart)); }
+function safeImage(value) { return typeof value==='string' && /^[a-f0-9-]+\.(jpg|png|webp)$/i.test(value); }
+async function loadCatalog() { const response=await fetch('/api/products'); if(!response.ok) throw new Error('Не удалось обновить каталог'); const products=await response.json(); catalog=new Map(products.map(p=>[p.id,p])); }
 
 function renderCart() {
-    const cart = readCart();
-    const container = document.getElementById('cart-items');
-    const totalElement = document.getElementById('cart-total');
-    container.replaceChildren();
-    if (!cart.length) {
-        const text = document.createElement('p');
-        text.style.cssText = 'text-align:center;color:var(--muted);padding:40px 0';
-        text.textContent = 'Корзина пуста. ';
-        const link = document.createElement('a'); link.href = 'shop.html'; link.textContent = 'Перейти в магазин →'; link.style.color = 'var(--accent)';
-        text.append(link); container.append(text); totalElement.textContent = '0.00 ₽'; return;
-    }
-    let displayedTotal = 0;
-    cart.forEach((item, index) => {
-        const row = document.createElement('div'); row.className = 'cart-item glass';
-        if (safeImageName(item.preview)) { const image = document.createElement('img'); image.src = `/uploads/${encodeURIComponent(item.preview)}`; image.alt = String(item.title || 'Товар'); row.append(image); }
-        const info = document.createElement('div'); info.className = 'cart-item-info';
-        const title = document.createElement('h4'); title.textContent = String(item.title || 'Товар');
-        const price = document.createElement('p'); price.style.color = 'var(--muted)'; price.textContent = `${(Number(item.price || 0) / 100).toFixed(2)} ₽ × ${item.qty}`;
-        info.append(title, price); row.append(info);
-        const actions = document.createElement('div'); actions.className = 'cart-item-actions';
-        actions.append(actionButton('−', () => changeQty(index, -1)), document.createTextNode(String(item.qty)), actionButton('+', () => changeQty(index, 1)), actionButton('×', () => removeItem(index), 'remove'));
-        row.append(actions); container.append(row); displayedTotal += Number(item.price || 0) * item.qty;
-    });
-    totalElement.textContent = `${(displayedTotal / 100).toFixed(2)} ₽`;
+ const container=document.getElementById('cart-items'), total=document.getElementById('cart-total'), status=document.getElementById('cart-status');
+ const source=readCart(), cart=[]; container.replaceChildren(); let amount=0; status.textContent='';
+ for(const stored of source){ const product=catalog.get(stored.id); if(!product||product.stock<1) continue; const qty=Math.min(stored.qty,product.stock,100); cart.push({id:product.id,qty}); amount+=product.price*qty; container.append(cartRow(product,qty,cart.length-1)); }
+ saveCart(cart);
+ if(!cart.length){ const p=document.createElement('p'); p.textContent='Корзина пуста. '; const a=document.createElement('a'); a.href='/shop'; a.textContent='Перейти в магазин →'; p.append(a); container.append(p); document.getElementById('checkout-form').hidden=true; }
+ else document.getElementById('checkout-form').hidden=false;
+ total.textContent=`${(amount/100).toFixed(2)} ₽`; return cart;
 }
-function actionButton(text, handler, className) { const button = document.createElement('button'); button.type = 'button'; button.textContent = text; if (className) button.className = className; button.addEventListener('click', handler); return button; }
-function changeQty(index, delta) { const cart = readCart(); if (!cart[index]) return; cart[index].qty += delta; if (cart[index].qty <= 0) cart.splice(index, 1); else cart[index].qty = Math.min(cart[index].qty, 100); saveCart(cart); renderCart(); }
-function removeItem(index) { const cart = readCart(); cart.splice(index, 1); saveCart(cart); renderCart(); }
+function cartRow(product,qty,index){ const row=document.createElement('div'); row.className='cart-item glass'; if(safeImage(product.preview_image)){const img=document.createElement('img');img.src=`/uploads/${encodeURIComponent(product.preview_image)}`;img.alt=product.title;row.append(img);} const info=document.createElement('div');info.className='cart-item-info';const h=document.createElement('h4');h.textContent=product.title;const p=document.createElement('p');p.textContent=`${(product.price/100).toFixed(2)} ₽ × ${qty}`;info.append(h,p); const actions=document.createElement('div');actions.className='cart-item-actions';actions.append(button('−',`Уменьшить количество ${product.title}`,()=>change(index,-1)),document.createTextNode(String(qty)),button('+',`Увеличить количество ${product.title}`,()=>change(index,1)),button('×',`Удалить ${product.title}`,()=>remove(index),'remove'));row.append(info,actions);return row; }
+function button(text,label,action,className=''){const b=document.createElement('button');b.type='button';b.textContent=text;b.setAttribute('aria-label',label);b.className=className;b.onclick=action;return b;}
+function change(index,delta){const cart=readCart();if(!cart[index])return;const product=catalog.get(cart[index].id);cart[index].qty=Math.min((product&&product.stock)||100,cart[index].qty+delta);if(cart[index].qty<1)cart.splice(index,1);saveCart(cart);renderCart();}
+function remove(index){const cart=readCart();cart.splice(index,1);saveCart(cart);renderCart();}
 
-document.getElementById('checkout-form').addEventListener('submit', async event => {
-    event.preventDefault();
-    const cart = readCart(); if (!cart.length) return alert('Корзина пуста');
-    const button = event.target.querySelector('button[type="submit"]'); const original = button.textContent; button.textContent = 'Обработка...'; button.disabled = true;
-    try {
-        const response = await fetch('/api/payments/create', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ customer_name: document.getElementById('name').value, customer_phone: document.getElementById('phone').value, customer_email: document.getElementById('email').value || null, customer_address: document.getElementById('address').value || null, items: cart.map(item => ({product_id:item.id, quantity:item.qty})) }) });
-        const payment = await response.json(); if (!response.ok) throw new Error(payment.error || 'Ошибка сервера');
-        const confirmationUrl = payment.confirmation && payment.confirmation.confirmation_url;
-        if (!confirmationUrl || new URL(confirmationUrl).protocol !== 'https:') throw new Error('Не получена безопасная ссылка на оплату');
-        localStorage.removeItem('cart'); location.assign(confirmationUrl);
-    } catch (error) { alert(`Ошибка оформления: ${error.message}`); button.textContent = original; button.disabled = false; }
-});
-renderCart();
+async function initialize(){ const status=document.getElementById('cart-status'); try { await loadCatalog(); renderCart(); } catch(error){status.textContent=error.message;} const params=new URLSearchParams(location.search); if(params.get('success')==='1') status.textContent='Платёж обрабатывается. Корзина будет очищена после подтверждения заказа.'; }
+document.getElementById('checkout-form').addEventListener('submit',async event=>{event.preventDefault();const button=event.target.querySelector('[type=submit]'),status=document.getElementById('cart-status');button.disabled=true;status.textContent='Проверяем заказ…';try{await loadCatalog();const cart=renderCart();if(!cart.length)throw new Error('Корзина пуста');const response=await fetch('/api/payments/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer_name:document.getElementById('name').value,customer_phone:document.getElementById('phone').value,customer_email:document.getElementById('email').value||null,customer_address:document.getElementById('address').value||null,items:cart.map(i=>({product_id:i.id,quantity:i.qty}))})});const result=await response.json();if(!response.ok)throw new Error(result.error||'Не удалось создать платёж');const target=result.confirmation&&result.confirmation.confirmation_url;if(!target||new URL(target).protocol!=='https:')throw new Error('Не получена ссылка на оплату');sessionStorage.setItem('pending_order',result.metadata?.order_id||'');location.assign(target);}catch(error){status.textContent=error.message;button.disabled=false;}});
+initialize();

@@ -27,6 +27,31 @@ impl EmailService {
         }
     }
 
+    pub async fn send_contact(
+        &self,
+        id: uuid::Uuid,
+        name: &str,
+        phone: &str,
+        contact_email: Option<&str>,
+        message: &str,
+    ) -> anyhow::Result<()> {
+        if self.admin_email.is_empty() || self.from.is_empty() {
+            return Ok(());
+        }
+        let body = format!(
+            "Новая заявка #{id}\n\nИмя: {name}\nТелефон: {phone}\nEmail: {}\n\nЗадача:\n{message}",
+            contact_email.unwrap_or("—")
+        );
+        let email = Message::builder()
+            .from(self.from.parse()?)
+            .to(self.admin_email.parse()?)
+            .subject(format!("Заявка с сайта #{id}"))
+            .header(ContentType::TEXT_PLAIN)
+            .body(body)?;
+        self.mailer.send(email).await?;
+        Ok(())
+    }
+
     pub async fn send_order_confirmation(
         &self,
         order: &Order,

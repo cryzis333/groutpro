@@ -52,15 +52,15 @@
   const menuBtn = document.getElementById('menuBtn');
   const mobileMenu = document.getElementById('mobileMenu');
   const menuClose = document.getElementById('menuClose');
-  const mobileLinks = mobileMenu.querySelectorAll('a');
+  const mobileLinks = mobileMenu ? mobileMenu.querySelectorAll('a') : [];
 
   function toggleMenu(show) {
     mobileMenu.classList.toggle('active', show);
     document.body.style.overflow = show ? 'hidden' : '';
   }
 
-  menuBtn.addEventListener('click', () => toggleMenu(true));
-  menuClose.addEventListener('click', () => toggleMenu(false));
+  if (menuBtn) menuBtn.addEventListener('click', () => toggleMenu(true));
+  if (menuClose) menuClose.addEventListener('click', () => toggleMenu(false));
   mobileLinks.forEach(link => link.addEventListener('click', () => toggleMenu(false)));
 
   // Stats counter animation
