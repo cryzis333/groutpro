@@ -23,6 +23,7 @@ impl YookassaService {
         order_id: &str,
         description: &str,
         return_url: &str,
+        idempotency_key: &str,
     ) -> anyhow::Result<Value> {
         let amount_rub = amount as f64 / 100.0;
         let payload = json!({
@@ -48,7 +49,7 @@ impl YookassaService {
             .client
             .post("https://api.yookassa.ru/v3/payments")
             .basic_auth(&self.shop_id, Some(&self.secret_key))
-            .header("Idempotence-Key", uuid::Uuid::new_v4().to_string())
+            .header("Idempotence-Key", idempotency_key)
             .json(&payload)
             .send()
             .await?

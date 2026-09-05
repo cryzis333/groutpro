@@ -10,6 +10,7 @@ use serde_json::Value;
 
 pub async fn create_payment(
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
     Json(req): Json<CreateOrderRequest>,
 ) -> Result<Json<Value>, AppError> {
     if !state.config.payments_enabled() {
@@ -17,17 +18,46 @@ pub async fn create_payment(
             "Онлайн-оплата пока не настроена".into(),
         ));
     }
+    let idempotency_key = headers
+        .get("idempotency-key")
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| value.len() >= 16 && value.len() <= 128)
+        .ok_or_else(|| AppError::Validation("Повторите запрос с Idempotency-Key".into()))?;
+    if let Some(existing) =
+        sqlx::query_as::<_, Order>("SELECT * FROM orders WHERE idempotency_key = $1")
+            .bind(idempotency_key)
+            .fetch_optional(&state.pool)
+            .await?
+    {
+        if let Some(payment_id) = existing.payment_id {
+            return Ok(Json(
+                YookassaService::new(&state.config)
+                    .get_payment(&payment_id)
+                    .await
+                    .map_err(AppError::internal)?,
+            ));
+        }
+    }
     let order = persist_order(&state, &req).await?;
+    sqlx::query("UPDATE orders SET idempotency_key=$1, status='awaiting_payment', payment_deadline=NOW()+INTERVAL '30 minutes', updated_at=NOW() WHERE id=$2")
+        .bind(idempotency_key).bind(order.id).execute(&state.pool).await?;
     let yookassa = YookassaService::new(&state.config);
-    let payment = yookassa
+    let payment = match yookassa
         .create_payment(
             order.total_amount,
             &order.id.to_string(),
             &format!("Заказ {}", order.id),
             &format!("{}/cart?success=1", state.config.site_url),
+            idempotency_key,
         )
         .await
-        .map_err(AppError::internal)?;
+    {
+        Ok(payment) => payment,
+        Err(error) => {
+            crate::handlers::orders::release_reservation(&state, order.id, "cancelled").await?;
+            return Err(AppError::internal(error));
+        }
+    };
     let payment_id = payment.get("id").and_then(Value::as_str).ok_or_else(|| {
         AppError::internal(anyhow::anyhow!("YooKassa response has no payment id"))
     })?;
@@ -94,27 +124,12 @@ pub async fn yookassa_webhook(
     if actual != expected || currency != Some("RUB") {
         return Err(AppError::Unauthorized);
     }
-    let items =
-        sqlx::query_as::<_, OrderItem>("SELECT * FROM order_items WHERE order_id=$1 FOR UPDATE")
-            .bind(order.id)
-            .fetch_all(&mut *tx)
-            .await?;
-    for item in &items {
-        let changed = sqlx::query(
-            "UPDATE products SET stock=stock-$1, updated_at=NOW() WHERE id=$2 AND stock >= $1",
-        )
-        .bind(item.quantity)
-        .bind(item.product_id)
+    sqlx::query("UPDATE inventory_reservations SET status='consumed', consumed_at=NOW() WHERE order_id=$1 AND status='reserved'")
+        .bind(order.id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE orders SET status='paid', paid_at=NOW(), updated_at=NOW() WHERE id=$1")
+        .bind(order.id)
         .execute(&mut *tx)
         .await?;
-        if changed.rows_affected() != 1 {
-            return Err(AppError::Validation(
-                "Товар закончился, заказ отменён".into(),
-            ));
-        }
-    }
-    sqlx::query("UPDATE orders SET status='paid', paid_at=NOW(), notified_at=NOW(), updated_at=NOW() WHERE id=$1")
-        .bind(order.id).execute(&mut *tx).await?;
     let items = sqlx::query_as::<_, OrderItem>("SELECT * FROM order_items WHERE order_id=$1")
         .bind(order.id)
         .fetch_all(&mut *tx)

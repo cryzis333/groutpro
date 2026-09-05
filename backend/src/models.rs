@@ -28,6 +28,11 @@ pub struct Order {
     pub total_amount: i64,
     pub status: String,
     pub payment_id: Option<String>,
+    pub idempotency_key: Option<String>,
+    pub payment_deadline: Option<DateTime<Utc>>,
+    pub paid_at: Option<DateTime<Utc>>,
+    pub cancelled_at: Option<DateTime<Utc>>,
+    pub stock_released_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

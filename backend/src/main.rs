@@ -60,6 +60,17 @@ async fn main() -> anyhow::Result<()> {
         .allow_origin(origin)
         .allow_methods([Method::GET, Method::POST, Method::DELETE])
         .allow_headers(Any);
+    let sweeper_state = state.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+        loop {
+            interval.tick().await;
+            if let Err(error) = handlers::orders::expire_reservations(&sweeper_state).await {
+                tracing::error!(?error, "reservation cleanup failed");
+            }
+        }
+    });
+
     let app = Router::new()
         .route("/health", get(|| async { "ok" }))
         .route("/api/products", get(handlers::products::list_products))

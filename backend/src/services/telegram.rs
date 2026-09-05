@@ -22,15 +22,25 @@ impl TelegramService {
             return Ok(());
         }
         let text = format!(
-            "🛒 <b>Новый заказ!</b>\n\n            📋 ID: {}\n            👤 Имя: {}\n            📞 Телефон: {}\n            📧 Email: {}\n            💰 Сумма: {:.2} ₽\n            📦 Товары:\n{}\n            💳 Статус: {}",
+            "🛒 <b>Новый заказ!</b>\n\n📋 ID: {}\n👤 Имя: {}\n📞 Телефон: {}\n📧 Email: {}\n💰 Сумма: {} ₽\n📦 Товары:\n{}\n💳 Статус: {}",
             order.id,
-            order.customer_name,
-            order.customer_phone,
-            order.customer_email.as_deref().unwrap_or("-"),
-            order.total_amount as f64 / 100.0,
+            escape_html(&order.customer_name),
+            escape_html(&order.customer_phone),
+            escape_html(order.customer_email.as_deref().unwrap_or("-")),
+            format_money(order.total_amount),
             items,
-            order.status
+            escape_html(&order.status)
         );
+
+        fn format_money(cents: i64) -> String {
+            format!("{}.{:02}", cents / 100, cents.abs() % 100)
+        }
+        fn escape_html(value: &str) -> String {
+            value
+                .replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;")
+        }
 
         let url = format!("https://api.telegram.org/bot{}/sendMessage", self.bot_token);
         self.client

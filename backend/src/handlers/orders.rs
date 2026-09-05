@@ -6,6 +6,15 @@ pub async fn persist_order(state: &AppState, req: &CreateOrderRequest) -> Result
     let mut tx = state.pool.begin().await?;
     let mut priced = Vec::with_capacity(req.items.len());
     let mut total = 0_i64;
+    let mut quantities = std::collections::HashMap::new();
+    for item in &req.items {
+        *quantities.entry(item.product_id).or_insert(0_i32) += item.quantity;
+    }
+    if quantities.len() != req.items.len() {
+        return Err(AppError::Validation(
+            "Повторяющиеся товары объедините в одну позицию".into(),
+        ));
+    }
 
     for item in &req.items {
         let product =
@@ -40,8 +49,23 @@ pub async fn persist_order(state: &AppState, req: &CreateOrderRequest) -> Result
         sqlx::query("INSERT INTO order_items (order_id, product_id, product_title, quantity, price) VALUES ($1,$2,$3,$4,$5)")
             .bind(order.id).bind(product.id).bind(&product.title).bind(item.quantity).bind(product.price)
             .execute(&mut *tx).await?;
-        // Stock is reserved only after YooKassa confirms payment. This keeps
-        // abandoned or cancelled payment attempts from consuming inventory.
+        let changed = sqlx::query("UPDATE products SET stock = stock - $1, updated_at = NOW() WHERE id = $2 AND stock >= $1")
+            .bind(item.quantity)
+            .bind(product.id)
+            .execute(&mut *tx)
+            .await?;
+        if changed.rows_affected() != 1 {
+            return Err(AppError::Validation(format!(
+                "Недостаточно товара: {}",
+                product.title
+            )));
+        }
+        sqlx::query("INSERT INTO inventory_reservations (order_id, product_id, quantity, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '30 minutes') ON CONFLICT (order_id, product_id) DO NOTHING")
+            .bind(order.id)
+            .bind(product.id)
+            .bind(item.quantity)
+            .execute(&mut *tx)
+            .await?;
     }
     tx.commit().await?;
     Ok(order)
@@ -74,10 +98,42 @@ fn validate_order(req: &CreateOrderRequest) -> Result<(), AppError> {
 }
 
 pub async fn create_order(
-    State(state): State<AppState>,
-    Json(req): Json<CreateOrderRequest>,
+    State(_state): State<AppState>,
+    Json(_req): Json<CreateOrderRequest>,
 ) -> Result<Json<Order>, AppError> {
-    Ok(Json(persist_order(&state, &req).await?))
+    Err(AppError::Validation(
+        "Заказы создаются только через оплату".into(),
+    ))
+}
+
+pub async fn release_reservation(
+    state: &AppState,
+    order_id: uuid::Uuid,
+    status: &str,
+) -> Result<(), AppError> {
+    let mut tx = state.pool.begin().await?;
+    let reservations = sqlx::query_as::<_, (uuid::Uuid, i32)>("UPDATE inventory_reservations SET status='released', released_at=NOW() WHERE order_id=$1 AND status='reserved' RETURNING product_id, quantity")
+        .bind(order_id).fetch_all(&mut *tx).await?;
+    for (product_id, quantity) in reservations {
+        sqlx::query("UPDATE products SET stock=stock+$1, updated_at=NOW() WHERE id=$2")
+            .bind(quantity)
+            .bind(product_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    sqlx::query("UPDATE orders SET status=$1, cancelled_at=NOW(), stock_released_at=NOW(), updated_at=NOW() WHERE id=$2 AND status <> 'paid'")
+        .bind(status).bind(order_id).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+pub async fn expire_reservations(state: &AppState) -> Result<(), AppError> {
+    let ids = sqlx::query_scalar::<_, uuid::Uuid>("SELECT id FROM orders WHERE status='awaiting_payment' AND payment_deadline < NOW() AND stock_released_at IS NULL LIMIT 100")
+        .fetch_all(&state.pool).await?;
+    for id in ids {
+        release_reservation(state, id, "expired").await?;
+    }
+    Ok(())
 }
 
 pub async fn list_orders(State(state): State<AppState>) -> Result<Json<Vec<Order>>, AppError> {
