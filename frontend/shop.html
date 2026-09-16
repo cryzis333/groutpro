@@ -16,6 +16,7 @@
       <li><a href="/shop">Магазин</a></li>
       <li><a href="/contact">Контакты</a></li>
     </ul>
+    <a href="account.html" class="btn btn-secondary" style="padding:10px 20px;font-size:0.8rem">Профиль</a>
     <a href="/cart" class="btn btn-secondary" style="padding:10px 20px;font-size:0.8rem">🛒 Корзина</a>
     <button class="theme-toggle" id="themeToggle" aria-label="Переключить тему">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -29,7 +30,28 @@
         <h2>Товары и <span style="color:var(--accent)">услуги</span></h2>
         <p class="lead">Профессиональные материалы и оборудование для инъектирования бетона.</p>
       </div>
-      <div class="shop-toolbar" style="display:flex;gap:12px;flex-wrap:wrap;margin:24px 0"><label for="category-filter" class="sr-only">Категория</label><select id="category-filter"><option value="">Все категории</option></select><label for="sort-products" class="sr-only">Сортировка</label><select id="sort-products"><option value="new">Сначала новые</option><option value="price-asc">Сначала дешевле</option><option value="price-desc">Сначала дороже</option></select></div>
+      <div class="shop-toolbar glass">
+        <label class="shop-search">
+          <span class="sr-only">Поиск товаров</span>
+          <input type="search" id="shop-search" placeholder="Поиск товаров..." autocomplete="off">
+          <span aria-hidden="true">⌕</span>
+        </label>
+        <label class="shop-filter">
+          <span>Категория</span>
+          <select id="shop-category"><option value="">Все категории</option></select>
+        </label>
+        <label class="shop-filter">
+          <span>Сортировка</span>
+          <select id="shop-sort">
+            <option value="newest">Сначала новые</option>
+            <option value="price-asc">Сначала дешевле</option>
+            <option value="price-desc">Сначала дороже</option>
+            <option value="title">По названию</option>
+          </select>
+        </label>
+        <button type="button" class="btn btn-secondary shop-reset" id="shop-reset">Сбросить</button>
+      </div>
+      <p class="shop-result-count" id="shop-result-count" aria-live="polite"></p>
       <div class="shop-grid" id="shop-grid">
         <p style="text-align:center;color:var(--muted);grid-column:1/-1">Загрузка каталога...</p>
       </div>

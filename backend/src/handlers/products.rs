@@ -1,43 +1,80 @@
-use crate::{error::AppError, models::Product, state::AppState};
+use crate::{error::AppError, models::*, state::AppState};
 use axum::{
-    extract::{Multipart, Path, State},
+    extract::{Multipart, Path, Query, State},
     Json,
 };
 use std::path::Path as StdPath;
 use tokio::fs;
 use uuid::Uuid;
 
-const MAX_IMAGES: usize = 10;
-const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
+#[derive(Debug, serde::Deserialize)]
+pub struct ProductQuery {
+    pub q: Option<String>,
+    pub category: Option<String>,
+    pub sort: Option<String>,
+    pub page: Option<i64>,
+    pub page_size: Option<i64>,
+}
 
-pub async fn list_products(State(state): State<AppState>) -> Result<Json<Vec<Product>>, AppError> {
-    Ok(Json(
-        sqlx::query_as::<_, Product>("SELECT * FROM products ORDER BY created_at DESC")
-            .fetch_all(&state.pool)
-            .await?,
-    ))
+pub async fn list_products(
+    State(state): State<AppState>,
+    Query(query): Query<ProductQuery>,
+) -> Result<Json<Vec<Product>>, AppError> {
+    let page = query.page.unwrap_or(1).clamp(1, 10_000);
+    let page_size = query.page_size.unwrap_or(24).clamp(1, 100);
+    let offset = (page - 1) * page_size;
+    let search = query.q.as_deref().unwrap_or("").trim();
+    let category = query.category.as_deref().unwrap_or("").trim();
+    let order_by = match query.sort.as_deref() {
+        Some("price-asc") => "price ASC",
+        Some("price-desc") => "price DESC",
+        Some("title") => "title ASC",
+        _ => "created_at DESC",
+    };
+    let sql = format!(
+        "SELECT * FROM products
+         WHERE archived_at IS NULL AND is_published = TRUE
+           AND ($1 = '' OR title ILIKE '%' || $1 || '%' OR COALESCE(description, '') ILIKE '%' || $1 || '%')
+           AND ($2 = '' OR category = $2)
+         ORDER BY {order_by}
+         LIMIT $3 OFFSET $4"
+    );
+    let products = sqlx::query_as::<_, Product>(&sql)
+        .bind(search)
+        .bind(category)
+        .bind(page_size)
+        .bind(offset)
+        .fetch_all(&state.pool)
+        .await?;
+    Ok(Json(products))
 }
 
 pub async fn get_product(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Product>, AppError> {
-    Ok(Json(
-        sqlx::query_as::<_, Product>("SELECT * FROM products WHERE id=$1")
-            .bind(id)
-            .fetch_optional(&state.pool)
-            .await?
-            .ok_or(AppError::NotFound)?,
-    ))
+    let product = sqlx::query_as::<_, Product>(
+        "SELECT * FROM products WHERE id = $1 AND archived_at IS NULL AND is_published = TRUE",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    Ok(Json(product))
 }
 
 pub async fn create_product(
     State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> Result<Json<Product>, AppError> {
-    let (mut title, mut description, mut price, mut category, mut stock) =
-        (None, None, None, None, None);
-    let mut pending_images: Vec<(String, Vec<u8>)> = Vec::new();
+    let mut title = None;
+    let mut description = None;
+    let mut price = None;
+    let mut category = None;
+    let mut stock = Some(0);
+    let mut images = vec![];
+    let mut preview = None;
+
     while let Some(field) = multipart
         .next_field()
         .await
@@ -45,21 +82,45 @@ pub async fn create_product(
     {
         let name = field.name().unwrap_or("").to_string();
         if name == "images" {
-            if pending_images.len() >= MAX_IMAGES {
-                return Err(AppError::Validation("Максимум 10 изображений".into()));
+            if images.len() >= 10 {
+                return Err(AppError::Validation(
+                    "Можно загрузить не более 10 изображений".to_string(),
+                ));
             }
+            let content_type = field.content_type().map(str::to_owned);
             let data = field
                 .bytes()
                 .await
                 .map_err(|e| AppError::BadRequest(e.to_string()))?;
-            if data.len() > MAX_IMAGE_BYTES {
+            const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
+            if data.is_empty() || data.len() > MAX_IMAGE_BYTES {
                 return Err(AppError::Validation(
-                    "Изображение не должно превышать 5 МБ".into(),
+                    "Размер одного изображения должен быть не более 5 МБ".to_string(),
                 ));
             }
-            let extension = image_extension(&data)
-                .ok_or_else(|| AppError::Validation("Разрешены JPEG, PNG и WebP".into()))?;
-            pending_images.push((format!("{}.{}", Uuid::new_v4(), extension), data.to_vec()));
+            let extension = match content_type.as_deref() {
+                Some("image/jpeg") if data.starts_with(&[0xFF, 0xD8, 0xFF]) => "jpg",
+                Some("image/png") if data.starts_with(b"\x89PNG\r\n\x1a\n") => "png",
+                Some("image/webp")
+                    if data.starts_with(b"RIFF") && data.get(8..12) == Some(b"WEBP") =>
+                {
+                    "webp"
+                }
+                _ => {
+                    return Err(AppError::Validation(
+                        "Разрешены только изображения JPEG, PNG и WebP".to_string(),
+                    ))
+                }
+            };
+            let filename = format!("{}.{}", Uuid::new_v4(), extension);
+            let path = StdPath::new(&state.upload_dir).join(&filename);
+            fs::write(&path, &data)
+                .await
+                .map_err(|e| AppError::Internal(e.to_string()))?;
+            images.push(filename.clone());
+            if preview.is_none() {
+                preview = Some(filename);
+            }
         } else {
             let text = field
                 .text()
@@ -71,50 +132,66 @@ pub async fn create_product(
                 "price" => {
                     price = Some(
                         text.parse::<i64>()
-                            .map_err(|_| AppError::Validation("Некорректная цена".into()))?,
+                            .map_err(|_| AppError::Validation("Invalid price".to_string()))?,
                     )
                 }
                 "category" => category = Some(text),
-                "stock" => {
-                    stock = Some(
-                        text.parse::<i32>()
-                            .map_err(|_| AppError::Validation("Некорректный остаток".into()))?,
-                    )
-                }
+                "stock" => stock = Some(text.parse::<i32>().unwrap_or(0)),
                 _ => {}
             }
         }
     }
-    let title = title
-        .map(|v| v.trim().to_string())
-        .filter(|v| !v.is_empty() && v.chars().count() <= 200)
-        .ok_or_else(|| AppError::Validation("Укажите название до 200 символов".into()))?;
-    let price = price
-        .filter(|v| *v > 0)
-        .ok_or_else(|| AppError::Validation("Цена должна быть больше нуля".into()))?;
-    let stock = stock.unwrap_or(0);
-    if stock < 0 {
+
+    let title = title.ok_or(AppError::Validation("Title required".to_string()))?;
+    let price = price.ok_or(AppError::Validation("Price required".to_string()))?;
+    if title.trim().is_empty() || title.len() > 200 || price <= 0 || stock.unwrap_or(0) < 0 {
         return Err(AppError::Validation(
-            "Остаток не может быть отрицательным".into(),
+            "Проверьте название, цену и остаток товара".to_string(),
         ));
     }
-    let images: Vec<String> = pending_images
-        .iter()
-        .map(|(name, _)| name.clone())
-        .collect();
-    let preview = images.first().cloned();
-    let product = sqlx::query_as::<_, Product>("INSERT INTO products (title,description,price,preview_image,images,category,stock) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *")
-        .bind(title).bind(description).bind(price).bind(preview).bind(&images).bind(category).bind(stock).fetch_one(&state.pool).await?;
-    for (name, data) in pending_images {
-        let path = StdPath::new(&state.upload_dir).join(name);
-        if let Err(error) = fs::write(path, data).await {
-            sqlx::query("DELETE FROM products WHERE id=$1")
-                .bind(product.id)
-                .execute(&state.pool)
-                .await?;
-            return Err(AppError::internal(error));
-        }
+
+    let product = sqlx::query_as::<_, Product>(
+        "INSERT INTO products (title, description, price, preview_image, images, category, stock)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING *",
+    )
+    .bind(title)
+    .bind(description)
+    .bind(price)
+    .bind(preview)
+    .bind(&images)
+    .bind(category)
+    .bind(stock.unwrap_or(0))
+    .fetch_one(&state.pool)
+    .await?;
+
+    Ok(Json(product))
+}
+
+pub async fn update_product(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<CreateProductRequest>,
+) -> Result<Json<Product>, AppError> {
+    let title = req.title.trim();
+    if title.is_empty() || title.len() > 200 || req.price <= 0 || req.stock < 0 {
+        return Err(AppError::Validation(
+            "Проверьте название, цену и остаток товара".to_string(),
+        ));
     }
+    let product = sqlx::query_as::<_, Product>(
+        "UPDATE products SET title = $1, description = $2, price = $3, category = $4, stock = $5, updated_at = NOW()
+         WHERE id = $6 AND archived_at IS NULL RETURNING *",
+    )
+    .bind(title)
+    .bind(req.description.as_deref().map(str::trim).filter(|value| !value.is_empty()))
+    .bind(req.price)
+    .bind(req.category.as_deref().map(str::trim).filter(|value| !value.is_empty()))
+    .bind(req.stock)
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
     Ok(Json(product))
 }
 
@@ -122,37 +199,15 @@ pub async fn delete_product(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let product = sqlx::query_as::<_, Product>("DELETE FROM products WHERE id=$1 RETURNING *")
-        .bind(id)
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or(AppError::NotFound)?;
-    for image in product.images {
-        let _ = fs::remove_file(StdPath::new(&state.upload_dir).join(image)).await;
+    let result = sqlx::query(
+        "UPDATE products SET archived_at = NOW(), is_published = FALSE, updated_at = NOW()
+         WHERE id = $1 AND archived_at IS NULL",
+    )
+    .bind(id)
+    .execute(&state.pool)
+    .await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
     }
-    Ok(Json(serde_json::json!({"success":true})))
-}
-
-fn image_extension(data: &[u8]) -> Option<&'static str> {
-    if data.starts_with(&[0xff, 0xd8, 0xff]) {
-        Some("jpg")
-    } else if data.starts_with(b"\x89PNG\r\n\x1a\n") {
-        Some("png")
-    } else if data.len() >= 12 && &data[..4] == b"RIFF" && &data[8..12] == b"WEBP" {
-        Some("webp")
-    } else {
-        None
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::image_extension;
-    #[test]
-    fn detects_supported_images() {
-        assert_eq!(image_extension(&[0xff, 0xd8, 0xff, 0]), Some("jpg"));
-        assert_eq!(image_extension(b"\x89PNG\r\n\x1a\nrest"), Some("png"));
-        assert_eq!(image_extension(b"RIFF0000WEBP"), Some("webp"));
-        assert_eq!(image_extension(b"<script>"), None);
-    }
+    Ok(Json(serde_json::json!({ "success": true })))
 }

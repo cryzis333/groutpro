@@ -1,42 +1,57 @@
 use crate::{
     error::AppError,
-    handlers::orders::persist_order,
     models::*,
-    services::{email::EmailService, telegram::TelegramService, yookassa::YookassaService},
+    services::{
+        checkout::create_pending_order, email::EmailService, telegram::TelegramService,
+        yookassa::YookassaService,
+    },
     state::AppState,
 };
-use axum::{extract::State, Json};
-use serde_json::Value;
+use axum::{extract::State, http::HeaderMap, Json};
+use serde_json::{json, Value};
 
 pub async fn create_payment(
     State(state): State<AppState>,
-    Json(req): Json<CreateOrderRequest>,
+    headers: HeaderMap,
+    Json(mut req): Json<CreateOrderRequest>,
 ) -> Result<Json<Value>, AppError> {
     if !state.config.payments_enabled() {
         return Err(AppError::Validation(
             "Онлайн-оплата пока не настроена".into(),
         ));
     }
-    let order = persist_order(&state, &req).await?;
+    if let Ok(user) = crate::handlers::customer_auth::current_customer(&state, &headers).await {
+        req.customer_id = Some(user.id);
+    }
+    let order = create_pending_order(&state, &req).await?;
     let yookassa = YookassaService::new(&state.config);
+    let return_url = format!(
+        "{}/cart?success=1&order={}",
+        state.config.site_url, order.public_number
+    );
     let payment = yookassa
         .create_payment(
             order.total_amount,
             &order.id.to_string(),
-            &format!("Заказ {}", order.id),
-            &format!("{}/cart?success=1", state.config.site_url),
+            &format!("Заказ {}", order.public_number),
+            &return_url,
         )
         .await
-        .map_err(AppError::internal)?;
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+
     let payment_id = payment.get("id").and_then(Value::as_str).ok_or_else(|| {
-        AppError::internal(anyhow::anyhow!("YooKassa response has no payment id"))
+        AppError::Internal("YooKassa response has no payment id".to_string())
     })?;
     sqlx::query("UPDATE orders SET payment_id = $1, updated_at = NOW() WHERE id = $2")
         .bind(payment_id)
         .bind(order.id)
         .execute(&state.pool)
         .await?;
-    Ok(Json(payment))
+
+    Ok(Json(json!({
+        "payment": payment,
+        "order": order.public_number
+    })))
 }
 
 pub async fn yookassa_webhook(
@@ -57,9 +72,9 @@ pub async fn yookassa_webhook(
     let verified = YookassaService::new(&state.config)
         .get_payment(payment_id)
         .await
-        .map_err(AppError::internal)?;
+        .map_err(|error| AppError::Internal(error.to_string()))?;
     if verified.get("status").and_then(Value::as_str) != Some("succeeded") {
-        return Ok(Json(serde_json::json!({"status":"ignored"})));
+        return Ok(Json(json!({"status":"ignored"})));
     }
     let order_id = verified
         .get("metadata")
@@ -79,7 +94,7 @@ pub async fn yookassa_webhook(
     .ok_or(AppError::NotFound)?;
     if order.status == "paid" {
         tx.rollback().await?;
-        return Ok(Json(serde_json::json!({"status":"ok"})));
+        return Ok(Json(json!({"status":"ok"})));
     }
     let expected = format!("{:.2}", order.total_amount as f64 / 100.0);
     let actual = verified
@@ -113,11 +128,9 @@ pub async fn yookassa_webhook(
             ));
         }
     }
-    sqlx::query("UPDATE orders SET status='paid', paid_at=NOW(), notified_at=NOW(), updated_at=NOW() WHERE id=$1")
-        .bind(order.id).execute(&mut *tx).await?;
-    let items = sqlx::query_as::<_, OrderItem>("SELECT * FROM order_items WHERE order_id=$1")
+    sqlx::query("UPDATE orders SET status='paid', paid_at=NOW(), updated_at=NOW() WHERE id=$1")
         .bind(order.id)
-        .fetch_all(&mut *tx)
+        .execute(&mut *tx)
         .await?;
     tx.commit().await?;
 
@@ -128,13 +141,13 @@ pub async fn yookassa_webhook(
             "- {} x{} ({:.2} ₽)\n",
             escape_html(&item.product_title),
             item.quantity,
-            item.price as f64 / 100.0
+            item.final_unit_price as f64 / 100.0
         ));
         html.push_str(&format!(
             "<li>{} x{} — {:.2} ₽</li>",
             escape_html(&item.product_title),
             item.quantity,
-            item.price as f64 / 100.0
+            item.final_unit_price as f64 / 100.0
         ));
     }
     if let Err(error) = TelegramService::new(&state.config)
@@ -149,7 +162,7 @@ pub async fn yookassa_webhook(
     {
         tracing::error!(?error, "email notification failed");
     }
-    Ok(Json(serde_json::json!({"status":"ok"})))
+    Ok(Json(json!({"status":"ok"})))
 }
 
 fn escape_html(value: &str) -> String {

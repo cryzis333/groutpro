@@ -1,23 +1,93 @@
-let catalog = new Map();
-function readCart() { try { const value=JSON.parse(localStorage.getItem('cart')||'[]'); return Array.isArray(value)?value.filter(i=>/^[a-f0-9-]{36}$/i.test(i.id||'')&&Number.isInteger(i.qty)&&i.qty>0):[]; } catch (_) { return []; } }
-function saveCart(cart) { localStorage.setItem('cart',JSON.stringify(cart)); }
-function safeImage(value) { return typeof value==='string' && /^[a-f0-9-]+\.(jpg|png|webp)$/i.test(value); }
-async function loadCatalog() { const response=await fetch('/api/products'); if(!response.ok) throw new Error('Не удалось обновить каталог'); const products=await response.json(); catalog=new Map(products.map(p=>[p.id,p])); }
-
 function renderCart() {
- const container=document.getElementById('cart-items'), total=document.getElementById('cart-total'), status=document.getElementById('cart-status');
- const source=readCart(), cart=[]; container.replaceChildren(); let amount=0; status.textContent='';
- for(const stored of source){ const product=catalog.get(stored.id); if(!product||product.stock<1) continue; const qty=Math.min(stored.qty,product.stock,100); cart.push({id:product.id,qty}); amount+=product.price*qty; container.append(cartRow(product,qty,cart.length-1)); }
- saveCart(cart);
- if(!cart.length){ const p=document.createElement('p'); p.textContent='Корзина пуста. '; const a=document.createElement('a'); a.href='/shop'; a.textContent='Перейти в магазин →'; p.append(a); container.append(p); document.getElementById('checkout-form').hidden=true; }
- else document.getElementById('checkout-form').hidden=false;
- total.textContent=`${(amount/100).toFixed(2)} ₽`; return cart;
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    const container = document.getElementById('cart-items');
+    const totalEl = document.getElementById('cart-total');
+    if (!cart.length) {
+        container.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px 0">Корзина пуста. <a href="/shop" style="color:var(--accent)">Перейти в магазин →</a></p>';
+        totalEl.textContent = '0.00 ₽';
+        return;
+    }
+    let total = 0;
+    container.innerHTML = cart.map((item, i) => {
+        total += item.price * item.qty;
+        return `
+            <div class="cart-item glass">
+                <img src="/uploads/${item.preview || ''}" alt="" onerror="this.style.display='none'">
+                <div class="cart-item-info">
+                    <h4>${escapeHtml(item.title)}</h4>
+                    <p style="color:var(--muted)">${(item.price/100).toFixed(2)} ₽ × ${item.qty}</p>
+                </div>
+                <div class="cart-item-actions">
+                    <button onclick="changeQty(${i}, -1)">−</button>
+                    <span style="min-width:24px;text-align:center;font-weight:700">${item.qty}</span>
+                    <button onclick="changeQty(${i}, 1)">+</button>
+                    <button onclick="removeItem(${i})" class="remove">×</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+    totalEl.textContent = (total/100).toFixed(2) + ' ₽';
 }
-function cartRow(product,qty,index){ const row=document.createElement('div'); row.className='cart-item glass'; if(safeImage(product.preview_image)){const img=document.createElement('img');img.src=`/uploads/${encodeURIComponent(product.preview_image)}`;img.alt=product.title;row.append(img);} const info=document.createElement('div');info.className='cart-item-info';const h=document.createElement('h4');h.textContent=product.title;const p=document.createElement('p');p.textContent=`${(product.price/100).toFixed(2)} ₽ × ${qty}`;info.append(h,p); const actions=document.createElement('div');actions.className='cart-item-actions';actions.append(button('−',`Уменьшить количество ${product.title}`,()=>change(index,-1)),document.createTextNode(String(qty)),button('+',`Увеличить количество ${product.title}`,()=>change(index,1)),button('×',`Удалить ${product.title}`,()=>remove(index),'remove'));row.append(info,actions);return row; }
-function button(text,label,action,className=''){const b=document.createElement('button');b.type='button';b.textContent=text;b.setAttribute('aria-label',label);b.className=className;b.onclick=action;return b;}
-function change(index,delta){const cart=readCart();if(!cart[index])return;const product=catalog.get(cart[index].id);cart[index].qty=Math.min((product&&product.stock)||100,cart[index].qty+delta);if(cart[index].qty<1)cart.splice(index,1);saveCart(cart);renderCart();}
-function remove(index){const cart=readCart();cart.splice(index,1);saveCart(cart);renderCart();}
 
-async function initialize(){ const status=document.getElementById('cart-status'); try { await loadCatalog(); renderCart(); } catch(error){status.textContent=error.message;} const params=new URLSearchParams(location.search); if(params.get('success')==='1') status.textContent='Платёж обрабатывается. Корзина будет очищена после подтверждения заказа.'; }
-document.getElementById('checkout-form').addEventListener('submit',async event=>{event.preventDefault();const button=event.target.querySelector('[type=submit]'),status=document.getElementById('cart-status');button.disabled=true;status.textContent='Проверяем заказ…';try{await loadCatalog();const cart=renderCart();if(!cart.length)throw new Error('Корзина пуста');const response=await fetch('/api/payments/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer_name:document.getElementById('name').value,customer_phone:document.getElementById('phone').value,customer_email:document.getElementById('email').value||null,customer_address:document.getElementById('address').value||null,items:cart.map(i=>({product_id:i.id,quantity:i.qty}))})});const result=await response.json();if(!response.ok)throw new Error(result.error||'Не удалось создать платёж');const target=result.confirmation&&result.confirmation.confirmation_url;if(!target||new URL(target).protocol!=='https:')throw new Error('Не получена ссылка на оплату');sessionStorage.setItem('pending_order',result.metadata?.order_id||'');location.assign(target);}catch(error){status.textContent=error.message;button.disabled=false;}});
-initialize();
+window.changeQty = (i, delta) => {
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    cart[i].qty += delta;
+    if (cart[i].qty <= 0) cart.splice(i, 1);
+    localStorage.setItem('cart', JSON.stringify(cart));
+    renderCart();
+};
+
+window.removeItem = (i) => {
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    cart.splice(i, 1);
+    localStorage.setItem('cart', JSON.stringify(cart));
+    renderCart();
+};
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+document.getElementById('checkout-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    if (!cart.length) return alert('Корзина пуста');
+
+    const btn = e.target.querySelector('button[type="submit"]');
+    const originalText = btn.textContent;
+    btn.textContent = 'Обработка...';
+    btn.disabled = true;
+
+    const data = {
+        customer_name: document.getElementById('name').value,
+        customer_phone: document.getElementById('phone').value,
+        customer_email: document.getElementById('email').value || null,
+        customer_address: document.getElementById('address').value || null,
+        items: cart.map(c => ({ product_id: c.id, quantity: c.qty }))
+    };
+
+    try {
+        const res = await fetch('/api/payments/create', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(data)
+        });
+        const payment = await res.json();
+        if (payment.error) throw new Error(payment.error);
+        const confirmUrl = payment.payment?.confirmation?.confirmation_url || payment.confirmation?.confirmation_url;
+        if (confirmUrl) {
+            localStorage.removeItem('cart');
+            location.href = confirmUrl;
+        } else {
+            throw new Error('Не получена ссылка на оплату');
+        }
+    } catch (err) {
+        alert('Ошибка оформления: ' + err.message);
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+};
+
+renderCart();

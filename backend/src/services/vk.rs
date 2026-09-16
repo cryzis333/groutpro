@@ -1,7 +1,9 @@
 use crate::config::Config;
 
+#[allow(dead_code)]
 pub struct VkService;
 
+#[allow(dead_code)]
 impl VkService {
     pub fn new(_config: &Config) -> Self {
         Self

@@ -47,7 +47,16 @@ async fn main() -> anyhow::Result<()> {
         )
         .route(
             "/api/admin/products/:id",
-            delete(handlers::products::delete_product),
+            axum::routing::put(handlers::products::update_product)
+                .delete(handlers::products::delete_product),
+        )
+        .route(
+            "/api/admin/discounts",
+            get(handlers::discounts::list_discounts).post(handlers::discounts::create_discount),
+        )
+        .route(
+            "/api/admin/discounts/:id",
+            delete(handlers::discounts::delete_discount),
         )
         .route("/api/admin/orders", get(handlers::orders::list_orders))
         .route_layer(axum::middleware::from_fn_with_state(
@@ -58,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
     let origin: HeaderValue = cfg.site_url.parse()?;
     let cors = CorsLayer::new()
         .allow_origin(origin)
-        .allow_methods([Method::GET, Method::POST, Method::DELETE])
+        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PUT])
         .allow_headers(Any);
     let app = Router::new()
         .route("/health", get(|| async { "ok" }))
@@ -75,8 +84,19 @@ async fn main() -> anyhow::Result<()> {
             post(handlers::payments::yookassa_webhook),
         )
         .route("/api/admin/login", post(handlers::auth::login))
+        .route(
+            "/api/auth/register",
+            post(handlers::customer_auth::register),
+        )
+        .route("/api/auth/login", post(handlers::customer_auth::login))
+        .route("/api/auth/logout", post(handlers::customer_auth::logout))
+        .route("/api/auth/me", get(handlers::customer_auth::me))
+        .route(
+            "/api/account/orders",
+            get(handlers::customer_auth::list_my_orders),
+        )
         .merge(admin_routes)
-        .layer(DefaultBodyLimit::max(12 * 1024 * 1024))
+        .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .layer(cors)
         .layer(SetResponseHeaderLayer::if_not_present(
             HeaderName::from_static("x-content-type-options"),

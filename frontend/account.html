@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Личный кабинет — ГраутПро</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="nav glass">
+    <a href="index.html" class="nav-logo">Граут<span>Про</span></a>
+    <ul class="nav-links">
+      <li><a href="shop.html">Магазин</a></li>
+      <li><a href="cart.html">Корзина</a></li>
+      <li><a href="index.html#contact">Контакты</a></li>
+    </ul>
+    <button class="theme-toggle" id="themeToggle" aria-label="Переключить тему"></button>
+  </nav>
+
+  <main class="section account-section">
+    <div class="account-shell glass" id="account-guest">
+      <div class="account-intro">
+        <div class="section-label">Личный кабинет</div>
+        <h1>Заказы всегда <span>под рукой</span></h1>
+        <p>Создайте аккаунт, чтобы видеть историю заказов и получать персональные предложения.</p>
+      </div>
+      <div class="account-forms">
+        <form class="account-form" id="login-form">
+          <h2>Войти</h2>
+          <label>Email<input type="email" id="login-email" required autocomplete="email"></label>
+          <label>Пароль<input type="password" id="login-password" required autocomplete="current-password"></label>
+          <button class="btn btn-primary" type="submit">Войти</button>
+        </form>
+        <form class="account-form" id="register-form">
+          <h2>Регистрация</h2>
+          <label>Ваше имя<input type="text" id="register-name" required minlength="2" autocomplete="name"></label>
+          <label>Email<input type="email" id="register-email" required autocomplete="email"></label>
+          <label>Пароль <small>Минимум 10 символов</small><input type="password" id="register-password" required minlength="10" autocomplete="new-password"></label>
+          <button class="btn btn-secondary" type="submit">Создать аккаунт</button>
+        </form>
+      </div>
+      <p class="account-message" id="account-message" aria-live="polite"></p>
+    </div>
+
+    <section class="account-shell glass" id="account-profile" hidden>
+      <div class="account-profile-head">
+        <div>
+          <div class="section-label">Личный кабинет</div>
+          <h1 id="profile-name">Профиль</h1>
+          <p id="profile-email"></p>
+        </div>
+        <button class="btn btn-secondary" id="logout-button" type="button">Выйти</button>
+      </div>
+      <h2 class="account-orders-title">Мои заказы</h2>
+      <div class="account-orders" id="account-orders"><p>Загрузка заказов...</p></div>
+    </section>
+  </main>
+  <script src="js/main.js"></script>
+  <script src="js/account.js"></script>
+</body>
+</html>

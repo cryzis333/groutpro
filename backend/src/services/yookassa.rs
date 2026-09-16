@@ -44,7 +44,7 @@ impl YookassaService {
             }
         });
 
-        let response = self
+        let res = self
             .client
             .post("https://api.yookassa.ru/v3/payments")
             .basic_auth(&self.shop_id, Some(&self.secret_key))
@@ -52,9 +52,13 @@ impl YookassaService {
             .json(&payload)
             .send()
             .await?
-            .error_for_status()?;
+            .json::<Value>()
+            .await?;
 
-        Ok(response.json::<Value>().await?)
+        if !res.get("id").is_some_and(Value::is_string) {
+            return Err(anyhow::anyhow!("YooKassa rejected payment creation"));
+        }
+        Ok(res)
     }
 
     pub async fn get_payment(&self, payment_id: &str) -> anyhow::Result<Value> {

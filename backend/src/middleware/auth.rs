@@ -1,4 +1,5 @@
-use crate::{models::Claims, state::AppState};
+use crate::models::Claims;
+use crate::state::AppState;
 use axum::{
     extract::{Request, State},
     http::StatusCode,
@@ -12,24 +13,19 @@ pub async fn auth_middleware(
     req: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    let token = req
+    let auth = req
         .headers()
-        .get("cookie")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|cookies| {
-            cookies
-                .split(';')
-                .map(str::trim)
-                .find_map(|cookie| cookie.strip_prefix("admin_session="))
-        });
-    if let Some(token) = token {
-        if decode::<Claims>(
+        .get("authorization")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "));
+
+    if let Some(token) = auth {
+        let decoded = decode::<Claims>(
             token,
             &DecodingKey::from_secret(state.config.jwt_secret.as_bytes()),
             &Validation::default(),
-        )
-        .is_ok()
-        {
+        );
+        if decoded.is_ok() {
             return Ok(next.run(req).await);
         }
     }

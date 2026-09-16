@@ -22,5 +22,41 @@
   document.querySelectorAll('a[href^="#"]').forEach(anchor => anchor.addEventListener('click', event => { const selector = anchor.getAttribute('href'); if (!selector || selector === '#') return; const target = document.querySelector(selector); if (target) { event.preventDefault(); target.scrollIntoView({ behavior: 'smooth', block: 'start' }); history.replaceState(null, '', selector); } }));
   document.querySelectorAll('.stat-number[data-count]').forEach(el => { const target = Number(el.dataset.count); const suffix = el.dataset.suffix || ''; if (!('IntersectionObserver' in window)) { el.textContent = target + suffix; return; } const observer = new IntersectionObserver(entries => entries.forEach(entry => { if (!entry.isIntersecting) return; el.textContent = target + suffix; observer.disconnect(); }), { threshold: .5 }); observer.observe(el); });
   const heroBg = document.querySelector('.hero-bg');
-  if (heroBg && !window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) window.addEventListener('scroll', () => { heroBg.style.transform = `translateY(${window.scrollY * .3}px)`; }, { passive: true });
+  if (heroBg && !window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    window.addEventListener('scroll', () => {
+      const scrolled = window.pageYOffset;
+      heroBg.style.transform = `translateY(${scrolled * 0.3}px)`;
+    }, { passive: true });
+  }
+
+  // Gallery lightbox placeholder
+  const galleryItems = document.querySelectorAll('.gallery-item');
+  galleryItems.forEach(item => {
+    item.addEventListener('click', () => {
+      // Placeholder for lightbox - can be expanded
+      const img = item.querySelector('img');
+      if (img) {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.3s;';
+        const clone = img.cloneNode();
+        clone.style.cssText = 'max-width:90%;max-height:90%;object-fit:contain;border-radius:8px;transform:scale(0.9);transition:transform 0.3s;';
+        overlay.appendChild(clone);
+        document.body.appendChild(overlay);
+        document.body.style.overflow = 'hidden';
+        requestAnimationFrame(() => {
+          overlay.style.opacity = '1';
+          clone.style.transform = 'scale(1)';
+        });
+        overlay.addEventListener('click', () => {
+          overlay.style.opacity = '0';
+          clone.style.transform = 'scale(0.9)';
+          setTimeout(() => {
+            overlay.remove();
+            document.body.style.overflow = '';
+          }, 300);
+        });
+      }
+    });
+  });
+
 })();
