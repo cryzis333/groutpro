@@ -118,10 +118,27 @@ pub struct CategoryViewCount {
     pub views: i64,
 }
 
+#[derive(Debug, Serialize, FromRow)]
+pub struct DailyViewCount {
+    /// `YYYY-MM-DD`
+    pub date: String,
+    pub views: i64,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+pub struct PageViewCount {
+    pub path: String,
+    pub views: i64,
+}
+
 #[derive(Debug, Serialize)]
 pub struct ViewStats {
     pub total_views: i64,
     pub categories: Vec<CategoryViewCount>,
+    /// The last 30 days including today, oldest first; days without views are 0.
+    pub daily: Vec<DailyViewCount>,
+    /// Top 10 pages of the last 30 days.
+    pub pages: Vec<PageViewCount>,
 }
 
 #[derive(Debug, Deserialize)]
