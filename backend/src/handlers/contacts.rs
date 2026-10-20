@@ -168,13 +168,7 @@ pub async fn create_contact_request(
     let title = match &estimate {
         Some((_, total, lines)) => {
             fields.push(("Смета", format!("{lines}\n")));
-            fields.push((
-                "Ориентировочно",
-                format!(
-                    "{:.2} ₽ (без выезда — он бесплатный)",
-                    *total as f64 / 100.0
-                ),
-            ));
+            fields.push(("Ориентировочно", format!("{:.2} ₽", *total as f64 / 100.0)));
             "📐 Заявка на замер по смете"
         }
         None => "📩 Новая заявка с сайта",

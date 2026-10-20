@@ -56,6 +56,10 @@ pub struct Order {
     pub paid_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// `sbp` (online via YooKassa) or `invoice` (bank transfer for companies).
+    pub payment_method: Option<String>,
+    pub company_name: Option<String>,
+    pub company_inn: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
