@@ -62,11 +62,18 @@ pub async fn register(
         ));
     }
 
-    let salt = argon2::password_hash::SaltString::generate(&mut OsRng);
-    let password_hash = Argon2::default()
-        .hash_password(req.password.as_bytes(), &salt)
-        .map_err(|_| AppError::Internal("Не удалось создать аккаунт".to_string()))?
-        .to_string();
+    // Argon2 deliberately takes tens of milliseconds and ~19 MiB: run it on the
+    // blocking pool so a burst of sign-ups doesn't stall the async workers.
+    let password = req.password;
+    let password_hash = tokio::task::spawn_blocking(move || {
+        let salt = argon2::password_hash::SaltString::generate(&mut OsRng);
+        Argon2::default()
+            .hash_password(password.as_bytes(), &salt)
+            .map(|hash| hash.to_string())
+    })
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?
+    .map_err(|_| AppError::Internal("Не удалось создать аккаунт".to_string()))?;
     let user = sqlx::query_as::<_, CustomerProfile>(
         "INSERT INTO users (email, password_hash, display_name)
          VALUES ($1, $2, $3)
@@ -91,7 +98,8 @@ pub async fn login(
     State(state): State<AppState>,
     AppJson(req): AppJson<CustomerLoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let email = req.email.trim().to_lowercase();
+    let CustomerLoginRequest { email, password } = req;
+    let email = email.trim().to_lowercase();
     let user = sqlx::query_as::<_, StoredUser>(
         "SELECT id, password_hash, role FROM users WHERE LOWER(email) = LOWER($1)",
     )
@@ -100,12 +108,17 @@ pub async fn login(
     .await?
     .ok_or(AppError::Unauthorized)?;
 
-    let hash = PasswordHash::new(&user.password_hash).map_err(|_| AppError::Unauthorized)?;
-    if user.role != "customer"
-        || Argon2::default()
-            .verify_password(req.password.as_bytes(), &hash)
-            .is_err()
-    {
+    let stored_hash = user.password_hash;
+    let password_ok = tokio::task::spawn_blocking(move || {
+        PasswordHash::new(&stored_hash).is_ok_and(|hash| {
+            Argon2::default()
+                .verify_password(password.as_bytes(), &hash)
+                .is_ok()
+        })
+    })
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+    if user.role != "customer" || !password_ok {
         return Err(AppError::Unauthorized);
     }
 
@@ -132,7 +145,9 @@ pub async fn logout(
     let mut response = StatusCode::NO_CONTENT.into_response();
     response.headers_mut().append(
         header::SET_COOKIE,
-        HeaderValue::from_static("groutpro_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"),
+        HeaderValue::from_static(
+            "groutpro_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
+        ),
     );
     response
 }
@@ -229,7 +244,10 @@ async fn session_response(
         .execute(&state.pool)
         .await?;
     let mut response = Json(user).into_response();
-    let cookie = format!("{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age={SESSION_LIFETIME_SECONDS}");
+    // Secure: the session must never travel over plain HTTP (nginx also listens on 80).
+    let cookie = format!(
+        "{SESSION_COOKIE}={token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age={SESSION_LIFETIME_SECONDS}"
+    );
     response.headers_mut().append(
         header::SET_COOKIE,
         HeaderValue::from_str(&cookie)
