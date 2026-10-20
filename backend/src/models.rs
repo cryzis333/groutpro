@@ -70,8 +70,6 @@ pub struct CreateOrderRequest {
     #[serde(default)]
     pub consent: bool,
     #[serde(default)]
-    pub not_robot: bool,
-    #[serde(default)]
     pub website: Option<String>,
 }
 
@@ -145,8 +143,6 @@ pub struct CustomerRegisterRequest {
     pub password: String,
     #[serde(default)]
     pub consent: bool,
-    #[serde(default)]
-    pub not_robot: bool,
     #[serde(default)]
     pub website: Option<String>,
 }

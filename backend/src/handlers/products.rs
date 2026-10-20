@@ -133,11 +133,19 @@ pub async fn create_product(
                 }
                 "category" => {
                     let trimmed = text.trim().to_string();
-                    category = if trimmed.is_empty() { None } else { Some(trimmed) };
+                    category = if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some(trimmed)
+                    };
                 }
                 "unit" => {
                     let trimmed = text.trim().to_string();
-                    unit = if trimmed.is_empty() { None } else { Some(trimmed) };
+                    unit = if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some(trimmed)
+                    };
                 }
                 "stock" => stock = Some(text.parse::<i32>().unwrap_or(0)),
                 _ => {}

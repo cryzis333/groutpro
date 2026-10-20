@@ -145,22 +145,32 @@ pub async fn yookassa_webhook(
         .await?;
     let mut per_product: Vec<(uuid::Uuid, String, i64)> = Vec::new();
     for item in &items {
-        match per_product.iter_mut().find(|(id, _, _)| *id == item.product_id) {
+        match per_product
+            .iter_mut()
+            .find(|(id, _, _)| *id == item.product_id)
+        {
             Some(entry) => entry.2 += item.quantity as i64,
-            None => per_product.push((item.product_id, item.product_title.clone(), item.quantity as i64)),
+            None => per_product.push((
+                item.product_id,
+                item.product_title.clone(),
+                item.quantity as i64,
+            )),
         }
     }
     // Two buyers can pay for the last unit at nearly the same time; the money is
     // already taken, so the order stays paid and the notification flags the shortage.
     let mut shortages = Vec::new();
     for (product_id, title, quantity) in &per_product {
-        let stock: Option<i32> = sqlx::query_scalar("SELECT stock FROM products WHERE id = $1 FOR UPDATE")
-            .bind(product_id)
-            .fetch_optional(&mut *tx)
-            .await?;
+        let stock: Option<i32> =
+            sqlx::query_scalar("SELECT stock FROM products WHERE id = $1 FOR UPDATE")
+                .bind(product_id)
+                .fetch_optional(&mut *tx)
+                .await?;
         if let Some(stock) = stock {
             if (stock as i64) < *quantity {
-                shortages.push(format!("— {title}: на складе было {stock}, оплачено {quantity}"));
+                shortages.push(format!(
+                    "— {title}: на складе было {stock}, оплачено {quantity}"
+                ));
             }
             sqlx::query("UPDATE products SET stock = GREATEST(stock - $2, 0), updated_at = NOW() WHERE id = $1")
                 .bind(product_id)
@@ -195,20 +205,36 @@ pub async fn yookassa_webhook(
     if let Some(address) = &order.customer_address {
         fields.push(("Адрес", address.clone()));
     }
-    fields.push(("Сумма", format!("{:.2} ₽", order.total_amount as f64 / 100.0)));
+    fields.push((
+        "Сумма",
+        format!("{:.2} ₽", order.total_amount as f64 / 100.0),
+    ));
     fields.push(("Товары", format!("{items_str}\n")));
     let title = if shortages.is_empty() {
         format!("🛒 Оплачен заказ {}", order.public_number)
     } else {
-        fields.push(("⚠️ Не хватает на складе", format!("{}\nСвяжитесь с клиентом: замена, ожидание или возврат.\n", shortages.join("\n"))));
-        format!("⚠️ Оплачен заказ {} — не хватает товара на складе", order.public_number)
+        fields.push((
+            "⚠️ Не хватает на складе",
+            format!(
+                "{}\nСвяжитесь с клиентом: замена, ожидание или возврат.\n",
+                shortages.join("\n")
+            ),
+        ));
+        format!(
+            "⚠️ Оплачен заказ {} — не хватает товара на складе",
+            order.public_number
+        )
     };
     Notifier::spawn(
         &state.config,
         Notification {
             title,
             fields,
-            link: state.config.site_url.as_deref().map(|s| format!("{s}/admin#orders")),
+            link: state
+                .config
+                .site_url
+                .as_deref()
+                .map(|s| format!("{s}/admin#orders")),
             reply_to: order.customer_email.clone(),
         },
     );
@@ -265,8 +291,7 @@ pub async fn create_invoice_order(
             )
         })
         .collect::<Vec<_>>()
-        .join("
-");
+        .join("\n");
     let mut fields = vec![
         ("Организация", company.to_string()),
         ("ИНН", inn),
@@ -280,8 +305,7 @@ pub async fn create_invoice_order(
         "Сумма",
         format!("{:.2} ₽", order.total_amount as f64 / 100.0),
     ));
-    fields.push(("Товары", format!("{items_str}
-")));
+    fields.push(("Товары", format!("{items_str}\n")));
     Notifier::spawn(
         &state.config,
         Notification {

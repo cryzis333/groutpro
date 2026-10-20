@@ -80,9 +80,7 @@ impl Config {
                 .filter(|v| !v.is_empty())
                 .unwrap_or_else(|| "https://platform-api.max.ru".to_string()),
             smtp_host: get("SMTP_HOST").unwrap_or_else(|| "smtp.yandex.ru".to_string()),
-            smtp_port: get("SMTP_PORT")
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(465),
+            smtp_port: get("SMTP_PORT").and_then(|v| v.parse().ok()).unwrap_or(465),
             smtp_user: or_default("SMTP_USER"),
             smtp_password: or_default("SMTP_PASSWORD"),
             smtp_from: or_default("SMTP_FROM"),

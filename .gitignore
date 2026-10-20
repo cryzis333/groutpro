@@ -9,6 +9,7 @@ backend/.env.*
 uploads/*
 !uploads/.gitkeep
 backups/
+secrets/
 *.dump
 *.sql.gz
 *.pem

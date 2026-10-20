@@ -88,9 +88,7 @@ pub async fn create_contact_request(
     let phone = req.phone.trim();
     let digits = phone.chars().filter(char::is_ascii_digit).count();
     if !(10..=15).contains(&digits) || phone.chars().count() > 32 {
-        return Err(AppError::Validation(
-            "Проверьте номер телефона".to_string(),
-        ));
+        return Err(AppError::Validation("Проверьте номер телефона".to_string()));
     }
     let email = req
         .email
@@ -98,7 +96,10 @@ pub async fn create_contact_request(
         .map(str::trim)
         .filter(|v| !v.is_empty());
     if email.is_some_and(|v| {
-        v.len() > 254 || !v.rsplit_once('@').is_some_and(|(user, domain)| !user.is_empty() && domain.contains('.'))
+        v.len() > 254
+            || !v
+                .rsplit_once('@')
+                .is_some_and(|(user, domain)| !user.is_empty() && domain.contains('.'))
     }) {
         return Err(AppError::Validation("Проверьте email".to_string()));
     }
@@ -108,9 +109,17 @@ pub async fn create_contact_request(
             "Описание слишком длинное (до 3000 символов)".to_string(),
         ));
     }
-    let message = if message.is_empty() { "(без описания)" } else { message };
+    let message = if message.is_empty() {
+        "(без описания)"
+    } else {
+        message
+    };
     let estimate = resolve_estimate(&state, &req).await?;
-    let source = if estimate.is_some() { "estimate" } else { "contact" };
+    let source = if estimate.is_some() {
+        "estimate"
+    } else {
+        "contact"
+    };
 
     // Spam brakes: the same phone at most 3 times per 10 minutes, and a global
     // hourly cap so a bot can't flood the Telegram chat.
@@ -147,7 +156,10 @@ pub async fn create_contact_request(
     .fetch_one(&state.pool)
     .await?;
 
-    let mut fields = vec![("Имя", saved.name.clone()), ("Телефон", saved.phone.clone())];
+    let mut fields = vec![
+        ("Имя", saved.name.clone()),
+        ("Телефон", saved.phone.clone()),
+    ];
     if let Some(email) = &saved.email {
         fields.push(("Email", email.clone()));
     }
@@ -157,7 +169,10 @@ pub async fn create_contact_request(
             fields.push(("Смета", format!("{lines}\n")));
             fields.push((
                 "Ориентировочно",
-                format!("{:.2} ₽ (без выезда — он бесплатный)", *total as f64 / 100.0),
+                format!(
+                    "{:.2} ₽ (без выезда — он бесплатный)",
+                    *total as f64 / 100.0
+                ),
             ));
             "📐 Заявка на замер по смете"
         }
@@ -168,7 +183,11 @@ pub async fn create_contact_request(
         Notification {
             title: title.to_string(),
             fields,
-            link: state.config.site_url.as_deref().map(|s| format!("{s}/admin#leads")),
+            link: state
+                .config
+                .site_url
+                .as_deref()
+                .map(|s| format!("{s}/admin#leads")),
             reply_to: saved.email.clone(),
         },
     );
@@ -242,7 +261,10 @@ pub async fn create_order_from_lead(
             }),
             // Старые заявки хранились без id товара — находим по названию.
             None => {
-                let title = entry.get("title").and_then(Value::as_str).unwrap_or_default();
+                let title = entry
+                    .get("title")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
                 let found: Option<(Uuid,)> = sqlx::query_as(
                     "SELECT id FROM products WHERE title = $1 AND archived_at IS NULL AND is_published = TRUE LIMIT 1",
                 )
@@ -274,15 +296,17 @@ pub async fn create_order_from_lead(
         company_name: None,
         company_inn: None,
         consent: true,
-        not_robot: true,
         website: None,
     };
-    let order = crate::services::checkout::create_pending_order(&state, &request, "invoice").await?;
+    let order =
+        crate::services::checkout::create_pending_order(&state, &request, "invoice").await?;
 
-    sqlx::query("UPDATE contact_requests SET status = 'in_progress' WHERE id = $1 AND status = 'new'")
-        .bind(id)
-        .execute(&state.pool)
-        .await?;
+    sqlx::query(
+        "UPDATE contact_requests SET status = 'in_progress' WHERE id = $1 AND status = 'new'",
+    )
+    .bind(id)
+    .execute(&state.pool)
+    .await?;
 
     Ok(Json(json!({
         "order": order.public_number,

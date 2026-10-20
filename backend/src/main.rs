@@ -123,10 +123,7 @@ async fn main() -> anyhow::Result<()> {
             "/api/account/profile",
             axum::routing::patch(handlers::customer_auth::update_profile),
         )
-        .route(
-            "/api/analytics/view",
-            post(handlers::analytics::track_view),
-        )
+        .route("/api/analytics/view", post(handlers::analytics::track_view))
         .route(
             "/api/contact",
             post(handlers::contacts::create_contact_request),

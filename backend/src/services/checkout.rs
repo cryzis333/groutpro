@@ -97,7 +97,15 @@ pub async fn create_pending_order(
         "GP-{}",
         Uuid::new_v4().simple().to_string()[..8].to_uppercase()
     );
-    let order = insert_order(&mut tx, req, total, &public_number, customer_id, payment_method).await?;
+    let order = insert_order(
+        &mut tx,
+        req,
+        total,
+        &public_number,
+        customer_id,
+        payment_method,
+    )
+    .await?;
 
     for (product, quantity, discount) in line_items {
         sqlx::query(
@@ -161,14 +169,28 @@ async fn insert_order(
     .bind(total)
     .bind(public_number)
     .bind(payment_method)
-    .bind(req.company_name.as_deref().map(str::trim).filter(|v| !v.is_empty()))
-    .bind(req.company_inn.as_deref().map(str::trim).filter(|v| !v.is_empty()))
+    .bind(
+        req.company_name
+            .as_deref()
+            .map(str::trim)
+            .filter(|v| !v.is_empty()),
+    )
+    .bind(
+        req.company_inn
+            .as_deref()
+            .map(str::trim)
+            .filter(|v| !v.is_empty()),
+    )
     .fetch_one(&mut **tx)
     .await?)
 }
 
 fn validate_order_request(req: &CreateOrderRequest) -> Result<(), AppError> {
-    if req.website.as_deref().is_some_and(|value| !value.trim().is_empty()) {
+    if req
+        .website
+        .as_deref()
+        .is_some_and(|value| !value.trim().is_empty())
+    {
         return Err(AppError::Validation(
             "Проверьте форму и попробуйте снова".to_string(),
         ));

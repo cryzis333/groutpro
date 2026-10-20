@@ -25,8 +25,6 @@ const SESSION_LIFETIME_SECONDS: i64 = 60 * 60 * 24 * 14;
 #[derive(FromRow)]
 struct StoredUser {
     id: Uuid,
-    email: String,
-    display_name: String,
     password_hash: String,
     role: String,
 }
@@ -35,7 +33,11 @@ pub async fn register(
     State(state): State<AppState>,
     Json(req): Json<CustomerRegisterRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    if req.website.as_deref().is_some_and(|value| !value.trim().is_empty()) {
+    if req
+        .website
+        .as_deref()
+        .is_some_and(|value| !value.trim().is_empty())
+    {
         return Err(AppError::Validation(
             "Проверьте форму и попробуйте снова".to_string(),
         ));
@@ -90,7 +92,7 @@ pub async fn login(
 ) -> Result<impl IntoResponse, AppError> {
     let email = req.email.trim().to_lowercase();
     let user = sqlx::query_as::<_, StoredUser>(
-        "SELECT id, email, display_name, password_hash, role FROM users WHERE LOWER(email) = LOWER($1)",
+        "SELECT id, password_hash, role FROM users WHERE LOWER(email) = LOWER($1)",
     )
     .bind(&email)
     .fetch_optional(&state.pool)
@@ -152,11 +154,19 @@ pub async fn update_profile(
     if name.is_empty() || name.len() > 120 {
         return Err(AppError::Validation("Проверьте имя".to_string()));
     }
-    let phone = req.phone.as_deref().map(str::trim).filter(|v| !v.is_empty());
+    let phone = req
+        .phone
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty());
     if phone.is_some_and(|v| v.len() > 32) {
         return Err(AppError::Validation("Проверьте телефон".to_string()));
     }
-    let address = req.address.as_deref().map(str::trim).filter(|v| !v.is_empty());
+    let address = req
+        .address
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty());
     if address.is_some_and(|v| v.len() > 500) {
         return Err(AppError::Validation("Слишком длинный адрес".to_string()));
     }
