@@ -51,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .route(
             "/api/admin/products",
-            post(handlers::products::create_product),
+            get(handlers::products::list_admin_products).post(handlers::products::create_product),
         )
         .route(
             "/api/admin/products/:id",

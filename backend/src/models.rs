@@ -16,6 +16,8 @@ pub struct Product {
     #[sqlx(default)]
     pub unit: Option<String>,
     pub stock: i32,
+    /// Manual catalog position (ascending); 1000 by default.
+    pub sort_order: i32,
     pub archived_at: Option<DateTime<Utc>>,
     pub is_published: bool,
     pub created_at: DateTime<Utc>,
@@ -35,6 +37,9 @@ pub struct CreateProductRequest {
     #[serde(default)]
     pub unit: Option<String>,
     pub stock: i32,
+    /// Absent — the current position is kept.
+    #[serde(default)]
+    pub sort_order: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
