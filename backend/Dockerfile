@@ -1,4 +1,6 @@
-FROM rust:1.75 as builder
+# Cargo.lock is format v4 (Cargo 1.78+); build with current stable like CI does.
+# bookworm matches the runtime image below (glibc, libssl3).
+FROM rust:1-bookworm AS builder
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
@@ -11,5 +13,5 @@ WORKDIR /app
 COPY --from=builder /app/target/release/groutpro-backend .
 COPY migrations ./migrations
 ENV RUST_LOG=info
-EXPOSE 3000
+EXPOSE 3100
 CMD ["./groutpro-backend"]
