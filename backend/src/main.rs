@@ -1,6 +1,7 @@
 mod config;
 mod db;
 mod error;
+mod extract;
 mod handlers;
 mod middleware;
 mod models;

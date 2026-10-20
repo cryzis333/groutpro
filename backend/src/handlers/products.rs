@@ -1,4 +1,4 @@
-use crate::{error::AppError, models::*, state::AppState};
+use crate::{error::AppError, extract::AppJson, models::*, state::AppState};
 use axum::{
     extract::{Multipart, Path, Query, State},
     Json,
@@ -183,7 +183,7 @@ pub async fn create_product(
 pub async fn update_product(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    Json(req): Json<CreateProductRequest>,
+    AppJson(req): AppJson<CreateProductRequest>,
 ) -> Result<Json<Product>, AppError> {
     let title = req.title.trim();
     if title.is_empty() || title.len() > 200 || req.price <= 0 || req.stock < 0 {

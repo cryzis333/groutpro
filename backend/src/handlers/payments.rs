@@ -1,5 +1,6 @@
 use crate::{
     error::AppError,
+    extract::AppJson,
     models::*,
     services::{
         checkout::create_pending_order,
@@ -19,7 +20,7 @@ const VERIFICATION_FAILED: &str = "Не удалось подтвердить п
 pub async fn create_payment(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(mut req): Json<CreateOrderRequest>,
+    AppJson(mut req): AppJson<CreateOrderRequest>,
 ) -> Result<Json<Value>, AppError> {
     // Checked before the order is created: without YooKassa credentials, or without
     // SITE_URL for the return address, the order could never be paid.
@@ -77,7 +78,7 @@ pub async fn create_payment(
 
 pub async fn yookassa_webhook(
     State(state): State<AppState>,
-    Json(payload): Json<Value>,
+    AppJson(payload): AppJson<Value>,
 ) -> Result<Json<Value>, AppError> {
     if payload.get("event").and_then(Value::as_str) != Some("payment.succeeded") {
         return Ok(Json(json!({ "status": "ignored" })));
@@ -256,7 +257,7 @@ pub async fn yookassa_webhook(
 pub async fn create_invoice_order(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(mut req): Json<CreateOrderRequest>,
+    AppJson(mut req): AppJson<CreateOrderRequest>,
 ) -> Result<Json<Value>, AppError> {
     if let Ok(user) = crate::handlers::customer_auth::current_customer(&state, &headers).await {
         req.customer_id = Some(user.id);

@@ -1,8 +1,8 @@
+use crate::error::AppError;
 use crate::models::Claims;
 use crate::state::AppState;
 use axum::{
     extract::{Request, State},
-    http::StatusCode,
     middleware::Next,
     response::Response,
 };
@@ -12,7 +12,7 @@ pub async fn auth_middleware(
     State(state): State<AppState>,
     req: Request,
     next: Next,
-) -> Result<Response, StatusCode> {
+) -> Result<Response, AppError> {
     let auth = req
         .headers()
         .get("authorization")
@@ -29,5 +29,6 @@ pub async fn auth_middleware(
             return Ok(next.run(req).await);
         }
     }
-    Err(StatusCode::UNAUTHORIZED)
+    // Same `{ "error": … }` JSON body as every other API error.
+    Err(AppError::Unauthorized)
 }

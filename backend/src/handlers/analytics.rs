@@ -1,5 +1,6 @@
 use crate::{
     error::AppError,
+    extract::AppJson,
     models::{CategoryViewCount, DailyAnalytics, TrackViewRequest, ViewStats},
     state::AppState,
 };
@@ -23,7 +24,7 @@ pub async fn get_analytics(
 
 pub async fn track_view(
     State(state): State<AppState>,
-    Json(req): Json<TrackViewRequest>,
+    AppJson(req): AppJson<TrackViewRequest>,
 ) -> Result<StatusCode, AppError> {
     let path = req.path.trim();
     if path.is_empty() || path.len() > 512 {

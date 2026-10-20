@@ -1,5 +1,6 @@
 use crate::{
     error::AppError,
+    extract::AppJson,
     models::{Claims, LoginRequest, LoginResponse},
     state::AppState,
 };
@@ -9,7 +10,7 @@ use jsonwebtoken::{encode, EncodingKey, Header};
 
 pub async fn login(
     State(state): State<AppState>,
-    Json(req): Json<LoginRequest>,
+    AppJson(req): AppJson<LoginRequest>,
 ) -> Result<Json<LoginResponse>, AppError> {
     if req.username != state.config.admin_username {
         return Err(AppError::Unauthorized);

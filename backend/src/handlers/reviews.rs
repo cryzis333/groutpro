@@ -1,5 +1,6 @@
 use crate::{
     error::AppError,
+    extract::AppJson,
     models::{CreateReviewRequest, PublicReview, Review, UpdateReviewStatusRequest},
     services::notify::{Notification, Notifier},
     state::AppState,
@@ -16,7 +17,7 @@ const COLUMNS: &str = "id, kind, author_name, rating, message, contact, status, 
 
 pub async fn create_review(
     State(state): State<AppState>,
-    Json(req): Json<CreateReviewRequest>,
+    AppJson(req): AppJson<CreateReviewRequest>,
 ) -> Result<(StatusCode, Json<Value>), AppError> {
     // Honeypot filled in — answer like success so bots don't adapt.
     if req.website.as_deref().is_some_and(|v| !v.trim().is_empty()) {
@@ -135,7 +136,7 @@ pub async fn list_reviews(State(state): State<AppState>) -> Result<Json<Vec<Revi
 pub async fn update_review_status(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    Json(req): Json<UpdateReviewStatusRequest>,
+    AppJson(req): AppJson<UpdateReviewStatusRequest>,
 ) -> Result<Json<Review>, AppError> {
     if !["new", "published", "rejected"].contains(&req.status.as_str()) {
         return Err(AppError::Validation("Неизвестный статус".to_string()));

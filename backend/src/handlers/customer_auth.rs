@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 use crate::{
     error::AppError,
+    extract::AppJson,
     models::{
         CustomerLoginRequest, CustomerOrder, CustomerProfile, CustomerRegisterRequest,
         UpdateProfileRequest,
@@ -31,7 +32,7 @@ struct StoredUser {
 
 pub async fn register(
     State(state): State<AppState>,
-    Json(req): Json<CustomerRegisterRequest>,
+    AppJson(req): AppJson<CustomerRegisterRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     if req
         .website
@@ -88,7 +89,7 @@ pub async fn register(
 
 pub async fn login(
     State(state): State<AppState>,
-    Json(req): Json<CustomerLoginRequest>,
+    AppJson(req): AppJson<CustomerLoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let email = req.email.trim().to_lowercase();
     let user = sqlx::query_as::<_, StoredUser>(
@@ -146,7 +147,7 @@ pub async fn me(
 pub async fn update_profile(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
-    Json(req): Json<UpdateProfileRequest>,
+    AppJson(req): AppJson<UpdateProfileRequest>,
 ) -> Result<Json<CustomerProfile>, AppError> {
     let current = current_customer(&state, &headers).await?;
 

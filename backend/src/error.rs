@@ -29,17 +29,20 @@ impl IntoResponse for AppError {
                 tracing::error!(%error, "database request failed");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    "Internal server error".to_string(),
+                    "Внутренняя ошибка сервера. Попробуйте позже.".to_string(),
                 )
             }
             AppError::Validation(msg) => (StatusCode::BAD_REQUEST, msg),
-            AppError::NotFound => (StatusCode::NOT_FOUND, "Not found".to_string()),
-            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()),
+            AppError::NotFound => (StatusCode::NOT_FOUND, "Не найдено".to_string()),
+            AppError::Unauthorized => (
+                StatusCode::UNAUTHORIZED,
+                "Требуется авторизация".to_string(),
+            ),
             AppError::Internal(error) => {
                 tracing::error!(%error, "internal request failed");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    "Internal server error".to_string(),
+                    "Внутренняя ошибка сервера. Попробуйте позже.".to_string(),
                 )
             }
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),

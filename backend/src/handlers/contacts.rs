@@ -1,5 +1,6 @@
 use crate::{
     error::AppError,
+    extract::AppJson,
     models::{ContactRequest, CreateContactRequest, UpdateContactStatusRequest},
     services::notify::{Notification, Notifier},
     state::AppState,
@@ -69,7 +70,7 @@ async fn resolve_estimate(
 
 pub async fn create_contact_request(
     State(state): State<AppState>,
-    Json(req): Json<CreateContactRequest>,
+    AppJson(req): AppJson<CreateContactRequest>,
 ) -> Result<(StatusCode, Json<Value>), AppError> {
     // Honeypot filled in — answer like a success so bots don't adapt.
     if req.website.as_deref().is_some_and(|v| !v.trim().is_empty()) {
@@ -209,7 +210,7 @@ pub async fn list_contact_requests(
 pub async fn update_contact_request_status(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    Json(req): Json<UpdateContactStatusRequest>,
+    AppJson(req): AppJson<UpdateContactStatusRequest>,
 ) -> Result<Json<ContactRequest>, AppError> {
     if !["new", "in_progress", "processed", "spam"].contains(&req.status.as_str()) {
         return Err(AppError::Validation("Неизвестный статус".to_string()));
