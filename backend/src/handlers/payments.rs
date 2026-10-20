@@ -4,30 +4,39 @@ use crate::{
     services::{
         checkout::create_pending_order,
         notify::{Notification, Notifier},
-        yookassa::YookassaService,
+        yookassa::{is_valid_payment_id, YookassaService},
     },
     state::AppState,
 };
 use axum::{extract::State, http::HeaderMap, Json};
 use serde_json::{json, Value};
 
+const PAYMENT_UNAVAILABLE: &str = "Онлайн-оплата сейчас недоступна. Оформите заказ по счёту, \
+     оставьте заявку на главной странице или позвоните нам — оформим заказ вручную.";
+const INVALID_WEBHOOK: &str = "Некорректное уведомление о платеже";
+const VERIFICATION_FAILED: &str = "Не удалось подтвердить платёж";
+
 pub async fn create_payment(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(mut req): Json<CreateOrderRequest>,
 ) -> Result<Json<Value>, AppError> {
+    // Checked before the order is created: without YooKassa credentials, or without
+    // SITE_URL for the return address, the order could never be paid.
+    let site_url = match state.config.site_url.as_deref() {
+        Some(site_url) if state.config.payments_enabled() => site_url.to_string(),
+        _ => {
+            tracing::warn!("online payment requested, but YooKassa or SITE_URL is not configured");
+            return Err(AppError::Validation(PAYMENT_UNAVAILABLE.to_string()));
+        }
+    };
     if let Ok(user) = crate::handlers::customer_auth::current_customer(&state, &headers).await {
         req.customer_id = Some(user.id);
     }
     let order = create_pending_order(&state, &req, "sbp").await?;
     let yookassa = YookassaService::new(&state.config);
     let return_url = format!(
-        "{}/cart.html?success=1&order={}",
-        state
-            .config
-            .site_url
-            .as_deref()
-            .unwrap_or("https://yourdomain.ru"),
+        "{site_url}/cart.html?success=1&order={}",
         order.public_number
     );
     let payment = yookassa
@@ -51,9 +60,7 @@ pub async fn create_payment(
             .bind(order.id)
             .execute(&state.pool)
             .await?;
-        return Err(AppError::Validation(
-            "Онлайн-оплата сейчас недоступна. Оставьте заявку на главной странице или позвоните нам — оформим заказ вручную.".to_string(),
-        ));
+        return Err(AppError::Validation(PAYMENT_UNAVAILABLE.to_string()));
     };
     let payment = payment.expect("payment id implies a successful response");
     sqlx::query("UPDATE orders SET payment_id = $1 WHERE id = $2 AND status = 'pending_payment'")
@@ -75,27 +82,31 @@ pub async fn yookassa_webhook(
     if payload.get("event").and_then(Value::as_str) != Some("payment.succeeded") {
         return Ok(Json(json!({ "status": "ignored" })));
     }
-    let payment_object = payload
+    if !state.config.payments_enabled() {
+        return Err(AppError::BadRequest(VERIFICATION_FAILED.to_string()));
+    }
+    // The id goes into the YooKassa API URL, so anything but a well-formed id is rejected.
+    let payment_id = payload
         .get("object")
-        .ok_or(AppError::BadRequest("Invalid webhook".to_string()))?;
-    let payment_id = payment_object
-        .get("id")
+        .and_then(|object| object.get("id"))
         .and_then(Value::as_str)
-        .ok_or(AppError::BadRequest("Invalid webhook".to_string()))?;
+        .filter(|id| is_valid_payment_id(id))
+        .ok_or_else(|| AppError::BadRequest(INVALID_WEBHOOK.to_string()))?;
 
     // Webhook data is not trusted. Re-fetch the payment from YooKassa before changing an order.
     let verified_payment = YookassaService::new(&state.config)
         .get_payment(payment_id)
         .await
-        .map_err(|_| AppError::BadRequest("Payment verification failed".to_string()))?;
-    let order_id = verified_payment
+        .map_err(|error| {
+            tracing::warn!(error = %format!("{error:#}"), "yookassa get_payment failed");
+            AppError::BadRequest(VERIFICATION_FAILED.to_string())
+        })?;
+    let order_uuid = verified_payment
         .get("metadata")
         .and_then(|m| m.get("order_id"))
         .and_then(Value::as_str)
-        .ok_or(AppError::BadRequest("Invalid payment metadata".to_string()))?;
-    let order_uuid = order_id
-        .parse::<uuid::Uuid>()
-        .map_err(|_| AppError::BadRequest("Invalid order reference".to_string()))?;
+        .and_then(|order_id| order_id.parse::<uuid::Uuid>().ok())
+        .ok_or_else(|| AppError::BadRequest(VERIFICATION_FAILED.to_string()))?;
 
     let order =
         sqlx::query_as::<_, Order>("SELECT * FROM orders WHERE id = $1 AND payment_id = $2")
@@ -123,9 +134,7 @@ pub async fn yookassa_webhook(
         || currency != Some("RUB")
         || amount != Some(order.total_amount)
     {
-        return Err(AppError::BadRequest(
-            "Payment verification failed".to_string(),
-        ));
+        return Err(AppError::BadRequest(VERIFICATION_FAILED.to_string()));
     }
 
     // Stock is written off exactly once, together with the status change: nothing is

@@ -63,6 +63,9 @@ impl YookassaService {
     }
 
     pub async fn get_payment(&self, payment_id: &str) -> anyhow::Result<Value> {
+        if !is_valid_payment_id(payment_id) {
+            anyhow::bail!("malformed YooKassa payment id");
+        }
         let response = self
             .client
             .get(format!("https://api.yookassa.ru/v3/payments/{payment_id}"))
@@ -71,5 +74,38 @@ impl YookassaService {
             .await?
             .error_for_status()?;
         Ok(response.json::<Value>().await?)
+    }
+}
+
+/// YooKassa payment ids are UUID-like strings. Anything else is rejected before
+/// it is put into the API URL (it would otherwise reach other endpoints with the
+/// shop's credentials).
+pub fn is_valid_payment_id(payment_id: &str) -> bool {
+    (1..=64).contains(&payment_id.len())
+        && payment_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_valid_payment_id;
+
+    #[test]
+    fn accepts_yookassa_ids() {
+        assert!(is_valid_payment_id("2d4f8c3e-000f-5000-9000-1b3c5e7a9d0f"));
+        assert!(is_valid_payment_id("a"));
+        assert!(is_valid_payment_id(&"A".repeat(64)));
+    }
+
+    #[test]
+    fn rejects_malformed_ids() {
+        assert!(!is_valid_payment_id(""));
+        assert!(!is_valid_payment_id(&"a".repeat(65)));
+        assert!(!is_valid_payment_id("../refunds"));
+        assert!(!is_valid_payment_id("abc?x=1"));
+        assert!(!is_valid_payment_id("abc/def"));
+        assert!(!is_valid_payment_id("abc def"));
+        assert!(!is_valid_payment_id("платёж"));
     }
 }
