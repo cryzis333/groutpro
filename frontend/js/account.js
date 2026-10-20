@@ -2,10 +2,16 @@
   const guest = document.getElementById('account-guest');
   const profile = document.getElementById('account-profile');
   const message = document.getElementById('account-message');
+  const profileMessage = document.getElementById('profile-message');
 
   function showMessage(text, isError = false) {
     message.textContent = text;
     message.classList.toggle('is-error', isError);
+  }
+
+  function showProfileMessage(text, isError = false) {
+    profileMessage.textContent = text;
+    profileMessage.classList.toggle('is-error', isError);
   }
 
   async function request(url, options = {}) {
@@ -19,21 +25,34 @@
     return data;
   }
 
+  function greetingWord() {
+    const hour = new Date().getHours();
+    if (hour < 5) return 'Доброй ночи';
+    if (hour < 12) return 'Доброе утро';
+    if (hour < 18) return 'Добрый день';
+    return 'Добрый вечер';
+  }
+
   async function loadProfile() {
     try {
       const user = await request('/api/auth/me');
       guest.hidden = true;
       profile.hidden = false;
+      document.getElementById('account-greeting').textContent = greetingWord() + ',';
       document.getElementById('profile-name').textContent = user.display_name;
       document.getElementById('profile-email').textContent = user.email;
+      document.getElementById('account-avatar').textContent = (user.display_name || '?').trim().charAt(0);
+      document.getElementById('profile-form-name').value = user.display_name || '';
+      document.getElementById('profile-form-phone').value = user.phone || '';
+      document.getElementById('profile-form-address').value = user.address || '';
       const orders = await request('/api/account/orders');
-      document.getElementById('account-orders').innerHTML = orders.length ? orders.map(order => `
-        <article class="account-order">
+      document.getElementById('account-orders').innerHTML = orders.length ? orders.map((order, index) => `
+        <article class="account-order" style="animation-delay:${(index * 0.06).toFixed(2)}s">
           <strong>${escapeHtml(order.public_number)}</strong>
-          <span>${formatStatus(order.status)}</span>
+          <span class="account-order-status account-order-status--${order.status}">${formatStatus(order.status)}</span>
           <span>${(order.total_amount / 100).toFixed(2)} ₽</span>
           <time>${new Date(order.created_at).toLocaleDateString('ru-RU')}</time>
-        </article>`).join('') : '<p>У вас пока нет заказов.</p>';
+        </article>`).join('') : '<p>У вас пока нет заказов. <a href="/shop">Загляните в каталог <svg class="icon icon-after" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" ><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></a></p>';
     } catch {
       guest.hidden = false;
       profile.hidden = true;
@@ -51,9 +70,29 @@
   document.getElementById('register-form').addEventListener('submit', async event => {
     event.preventDefault();
     try {
-      await request('/api/auth/register', { method: 'POST', body: JSON.stringify({ name: document.getElementById('register-name').value, email: document.getElementById('register-email').value, password: document.getElementById('register-password').value }) });
+      await request('/api/auth/register', { method: 'POST', body: JSON.stringify({
+        name: document.getElementById('register-name').value,
+        email: document.getElementById('register-email').value,
+        password: document.getElementById('register-password').value,
+        consent: document.getElementById('register-consent').checked,
+        website: document.getElementById('register-website').value
+      }) });
       await loadProfile();
     } catch (error) { showMessage(error.message, true); }
+  });
+
+  document.getElementById('profile-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    try {
+      await request('/api/account/profile', { method: 'PATCH', body: JSON.stringify({
+        display_name: document.getElementById('profile-form-name').value,
+        phone: document.getElementById('profile-form-phone').value,
+        address: document.getElementById('profile-form-address').value
+      }) });
+      document.getElementById('profile-name').textContent = document.getElementById('profile-form-name').value;
+      document.getElementById('account-avatar').textContent = (document.getElementById('profile-form-name').value || '?').trim().charAt(0);
+      showProfileMessage('Сохранено — теперь эти данные будут подставляться при оформлении заказа.');
+    } catch (error) { showProfileMessage(error.message, true); }
   });
 
   document.getElementById('logout-button').addEventListener('click', async () => {
@@ -63,5 +102,40 @@
 
   function escapeHtml(value) { const el = document.createElement('div'); el.textContent = value || ''; return el.innerHTML; }
   function formatStatus(status) { return ({ pending_payment: 'Ожидает оплаты', paid: 'Оплачен', processing: 'В обработке', fulfilled: 'Выполнен', cancelled: 'Отменён' })[status] || status; }
+
+  // Cursor-tracking spotlight glow on the login/profile cards.
+  document.querySelectorAll('.account-shell').forEach(shell => {
+    shell.addEventListener('pointermove', event => {
+      const rect = shell.getBoundingClientRect();
+      shell.style.setProperty('--spot-x', `${event.clientX - rect.left}px`);
+      shell.style.setProperty('--spot-y', `${event.clientY - rect.top}px`);
+      shell.classList.add('is-glowing');
+    });
+    shell.addEventListener('pointerleave', () => shell.classList.remove('is-glowing'));
+  });
+
+  // Magnetic buttons: nudge toward the cursor within their own box.
+  document.querySelectorAll('.account-shell .btn').forEach(btn => {
+    btn.addEventListener('pointermove', event => {
+      const rect = btn.getBoundingClientRect();
+      const x = event.clientX - rect.left - rect.width / 2;
+      const y = event.clientY - rect.top - rect.height / 2;
+      btn.style.transform = `translate(${x * 0.25}px, ${y * 0.35}px)`;
+    });
+    btn.addEventListener('pointerleave', () => { btn.style.transform = ''; });
+  });
+
+  // Avatar tilts toward the cursor in 3D, on top of its own spinning ring.
+  const avatarEl = document.getElementById('account-avatar');
+  if (avatarEl) {
+    avatarEl.addEventListener('pointermove', event => {
+      const rect = avatarEl.getBoundingClientRect();
+      const x = (event.clientX - rect.left - rect.width / 2) / (rect.width / 2);
+      const y = (event.clientY - rect.top - rect.height / 2) / (rect.height / 2);
+      avatarEl.style.transform = `perspective(300px) rotateY(${x * 22}deg) rotateX(${-y * 22}deg) scale(1.12)`;
+    });
+    avatarEl.addEventListener('pointerleave', () => { avatarEl.style.transform = ''; });
+  }
+
   loadProfile();
 })();

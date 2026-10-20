@@ -2,21 +2,25 @@
 <html lang="ru" data-theme="dark">
 <head>
   <meta charset="UTF-8">
+  <meta name="darkreader-lock">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Админ-панель — ГраутПро</title>
+  <script>if (!localStorage.getItem('admin_token')) { location.replace('/admin/login'); }</script>
   <link rel="stylesheet" href="/css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <!-- Icons: Lucide (ISC License) https://lucide.dev -->
 </head>
 <body>
   <div class="admin-layout">
     <aside class="admin-sidebar glass-strong">
       <h2>Граут<span style="color:var(--accent)">Про</span></h2>
       <nav>
-        <a href="#dashboard" class="active">📊 Аналитика</a>
-        <a href="#products">📦 Товары</a>
-        <a href="#orders">🛒 Заказы</a>
-        <a href="#discounts">🏷️ Скидки</a>
-        <a href="/">← На сайт</a>
+        <a href="#dashboard" class="active"><svg class="icon icon-inline" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" ><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg>Аналитика</a>
+        <a href="#leads"><svg class="icon icon-inline" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" ><polyline points="22 12 16 12 14 15 10 15 8 12 2 12" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></svg>Заявки <span class="leads-badge" id="leads-badge" hidden></span></a>
+        <a href="#reviews">⭐ Отзывы <span class="leads-badge" id="reviews-badge" hidden></span></a>
+        <a href="#products"><svg class="icon icon-inline" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" ><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" /><path d="M12 22V12" /><polyline points="3.29 7 12 12 20.71 7" /><path d="m7.5 4.27 9 5.15" /></svg>Товары</a>
+        <a href="#orders"><svg class="icon icon-inline" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" ><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18" /><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25" /><circle cx="18" cy="20" r="2" /><circle cx="8" cy="20" r="2" /></svg>Заказы</a>
+        <a href="/"><svg class="icon icon-inline" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" ><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>На сайт</a>
       </nav>
     </aside>
     <main class="admin-main">
@@ -35,9 +39,43 @@
             <h3 id="stat-avg">0 ₽</h3>
             <p>Средний чек</p>
           </div>
+          <div class="stat-card glass">
+            <h3 id="stat-views">0</h3>
+            <p>Посещений (30 дней)</p>
+          </div>
         </div>
         <div class="glass" style="padding:24px;border-radius:var(--radius)">
           <canvas id="revenueChart" height="100"></canvas>
+        </div>
+        <div class="glass" style="padding:24px;border-radius:var(--radius);margin-top:24px">
+          <h3 style="margin-bottom:16px;font-size:1rem;letter-spacing:-0.3px">Что чаще смотрят</h3>
+          <div id="category-views-list"><p style="color:var(--muted);font-size:0.85rem">Загрузка...</p></div>
+        </div>
+      </section>
+
+      <section id="leads" class="admin-section" style="margin-top:64px">
+        <h2 style="margin-bottom:8px;letter-spacing:-1px">Заявки с сайта</h2>
+        <p style="color:var(--muted);font-size:0.85rem;margin-bottom:24px">Форма «Свяжитесь с нами» на главной. Копии уходят в Telegram, MAX и на почту, если они подключены.</p>
+        <div class="admin-table-wrap glass">
+          <table class="admin-table">
+            <thead>
+              <tr><th>Дата</th><th>Имя</th><th>Телефон</th><th>Email</th><th>Задача</th><th>Статус</th></tr>
+            </thead>
+            <tbody id="leads-table"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="reviews" class="admin-section" style="margin-top:64px">
+        <h2 style="margin-bottom:8px;letter-spacing:-1px">Отзывы и предложения</h2>
+        <p style="color:var(--muted);font-size:0.85rem;margin-bottom:24px">На сайте показываются только отзывы со статусом «Опубликован». Предложения не публикуются никогда — это внутренние идеи от клиентов.</p>
+        <div class="admin-table-wrap glass">
+          <table class="admin-table">
+            <thead>
+              <tr><th>Дата</th><th>Тип</th><th>Имя</th><th>Оценка</th><th>Текст</th><th>Контакт</th><th>Статус</th></tr>
+            </thead>
+            <tbody id="reviews-table"></tbody>
+          </table>
         </div>
       </section>
 
@@ -56,19 +94,6 @@
         </div>
       </section>
 
-      <section id="discounts" class="admin-section" style="margin-top:64px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:16px">
-          <h2 style="letter-spacing:-1px">Скидки</h2>
-          <button id="open-discount-modal" class="btn btn-primary" type="button">+ Новая скидка</button>
-        </div>
-        <div class="admin-table-wrap glass">
-          <table class="admin-table">
-            <thead><tr><th>Объект</th><th>Размер</th><th>Для аккаунтов</th><th>Статус</th><th></th></tr></thead>
-            <tbody id="discounts-table"></tbody>
-          </table>
-        </div>
-      </section>
-
       <section id="orders" class="admin-section" style="margin-top:64px">
         <h2 style="margin-bottom:24px;letter-spacing:-1px">Заказы</h2>
         <div class="admin-table-wrap glass">
@@ -83,22 +108,9 @@
     </main>
   </div>
 
-  <div class="modal-overlay" id="discount-modal">
-    <div class="modal-content">
-      <button class="modal-close" id="close-discount-modal" type="button">×</button>
-      <h3 style="margin-bottom:24px">Новая скидка</h3>
-      <form id="discount-form">
-        <div class="form-group"><input type="text" id="d-category" placeholder="Категория (или оставьте пустой)"></div>
-        <div class="form-group"><input type="number" id="d-percent" placeholder="Скидка, %" min="0.01" max="99.99" step="0.01" required></div>
-        <label style="display:flex;gap:8px;align-items:center;margin:12px 0"><input type="checkbox" id="d-registered" checked> Только для зарегистрированных</label>
-        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">Создать скидку</button>
-      </form>
-    </div>
-  </div>
-
   <div class="modal-overlay" id="product-modal">
     <div class="modal-content">
-      <button class="modal-close" id="close-modal">×</button>
+      <button class="modal-close" id="close-modal" aria-label="Закрыть"><svg class="icon" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" ><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></button>
       <h3 id="product-modal-title" style="margin-bottom:24px;letter-spacing:-0.5px">Новый товар</h3>
       <form id="product-form">
         <div class="form-group">
@@ -111,20 +123,71 @@
           <input type="number" id="p-price" placeholder="Цена в ₽" step="0.01" required>
         </div>
         <div class="form-group">
-          <input type="text" id="p-cat" placeholder="Категория">
+          <input type="text" id="p-cat" placeholder="Категория" list="p-cat-list" autocomplete="off">
+          <datalist id="p-cat-list"></datalist>
         </div>
         <div class="form-group">
-          <input type="number" id="p-stock" placeholder="Количество" value="1">
+          <input type="text" id="p-unit" placeholder="Единица: пог. м, м², ввод, объект, шт" list="p-unit-list" autocomplete="off">
+          <datalist id="p-unit-list">
+            <option value="пог. м"><option value="м²"><option value="ввод"><option value="точка"><option value="объект"><option value="шт">
+          </datalist>
         </div>
-        <div class="product-discount-note">Скидки настраиваются в отдельном разделе «Скидки», чтобы не изменить цены целой категории случайно.</div>
+        <div class="form-group">
+          <input type="number" id="p-stock" placeholder="Количество (для штучных позиций)" value="1">
+        </div>
+        <div class="form-group">
+          <input type="number" id="p-discount" placeholder="Скидка, % (для зарегистрированных)" min="0" max="99.99" step="0.01">
+        </div>
         <div class="drop-zone" id="drop-zone">
           <p>Перетащите фото сюда или кликните для выбора</p>
           <p style="font-size:0.75rem;color:var(--muted);margin-top:8px">До 10 изображений. Первое — превью.</p>
           <input type="file" id="product-images" multiple accept="image/*" style="display:none">
         </div>
+        <p id="current-images-note" style="font-size:0.75rem;color:var(--muted);margin-bottom:8px" hidden></p>
+        <div id="current-images"></div>
         <div id="image-preview"></div>
         <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">Создать товар</button>
       </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="lead-modal">
+    <div class="modal-content lead-modal">
+      <button class="modal-close" id="close-lead-modal" aria-label="Закрыть"><svg class="icon" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" ><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></button>
+
+      <div class="lead-head">
+        <div>
+          <span class="lead-badge" id="lead-kind">Заявка с сайта</span>
+          <h3 id="lead-name">—</h3>
+        </div>
+        <time id="lead-date"></time>
+      </div>
+
+      <div class="lead-contact">
+        <div class="lead-contact-lines">
+          <a class="lead-phone" id="lead-phone-link" href="tel:"><span id="lead-phone">—</span></a>
+          <a class="lead-email-link" id="lead-email-link" href="mailto:"><span id="lead-email">—</span></a>
+        </div>
+        <div class="lead-actions">
+          <a class="btn btn-primary" id="lead-call" href="tel:">Позвонить</a>
+          <a class="btn btn-secondary" id="lead-whatsapp" href="#" target="_blank" rel="noopener">WhatsApp</a>
+          <button type="button" class="btn btn-secondary" id="lead-copy">Скопировать</button>
+        </div>
+      </div>
+
+      <div class="lead-status-bar" id="lead-status-bar" role="group" aria-label="Статус заявки"></div>
+
+      <div id="lead-estimate-block" hidden>
+        <h4 class="lead-section-title">Смета клиента</h4>
+        <table class="lead-estimate-table"><tbody id="lead-estimate"></tbody></table>
+        <div class="lead-order-actions">
+          <button type="button" class="btn btn-primary" id="lead-make-order">Создать заказ из сметы</button>
+          <span id="lead-order-result"></span>
+        </div>
+      </div>
+
+      <h4 class="lead-section-title">Задача</h4>
+      <div class="lead-modal-message" id="lead-message"></div>
     </div>
   </div>
 

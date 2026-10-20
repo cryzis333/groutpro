@@ -2,9 +2,9 @@
 <html lang="ru" data-theme="dark">
 <head>
   <meta charset="UTF-8">
+  <meta name="darkreader-lock">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Вход в админ-панель — ГраутПро</title>
-  <meta name="robots" content="noindex,nofollow">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px">
@@ -14,10 +14,10 @@
     </div>
     <form id="login-form">
       <div class="form-group">
-        <input type="text" id="username" placeholder="Логин" required>
+        <input type="text" id="username" placeholder="Логин" required autocomplete="username" autocapitalize="off" spellcheck="false">
       </div>
       <div class="form-group">
-        <input type="password" id="password" placeholder="Пароль" required>
+        <input type="password" id="password" placeholder="Пароль" required autocomplete="current-password">
       </div>
       <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px">Войти</button>
     </form>

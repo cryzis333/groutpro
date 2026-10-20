@@ -1,31 +1,90 @@
 <!DOCTYPE html>
 <html lang="ru" data-theme="light">
+
 <head>
   <meta charset="UTF-8">
+  <meta name="darkreader-lock">
+  <script>try { document.documentElement.setAttribute('data-theme', localStorage.getItem('groutpro-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) } catch (e) { }</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ГраутПро — Инъектирование бетона и гидроизоляция в Краснодаре</title>
-  <meta name="description" content="Профессиональное инъектирование трещин, гидроизоляция и восстановление бетонных конструкций в Краснодаре и Краснодарском крае.">
+  <meta name="description"
+    content="Профессиональное инъектирование трещин, гидроизоляция и восстановление бетонных конструкций в Краснодаре и Краснодарском крае.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+  <link rel="canonical" href="https://serious-company.ru/">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ГраутПро">
+  <meta property="og:locale" content="ru_RU">
+  <meta property="og:title" content="ГраутПро — инъектирование бетона и гидроизоляция">
+  <meta property="og:description" content="Инъектирование бетона, гидроизоляция и стабилизация грунта в Краснодаре и ЮФО.">
+  <meta property="og:url" content="https://serious-company.ru/">
+  <meta property="og:image" content="https://serious-company.ru/images/gallery-soil-diagram.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ГраутПро — инъектирование бетона и гидроизоляция">
+  <meta name="twitter:description" content="Инъектирование бетона, гидроизоляция и стабилизация грунта в Краснодаре и ЮФО.">
+  <meta name="twitter:image" content="https://serious-company.ru/images/gallery-soil-diagram.jpg">
   <link rel="stylesheet" href="/css/style.css">
+  <!-- Icons: Lucide (ISC License) https://lucide.dev -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "name": "ГраутПро",
+    "description": "Инъектирование бетона, гидроизоляция и стабилизация (закрепление) грунта. Восстановление конструкций без демонтажа.",
+    "url": "https://serious-company.ru",
+    "telephone": "+79054053133",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Краснодар",
+      "streetAddress": "улица Новороссийская, 51/2",
+      "addressCountry": "RU"
+    },
+    "image": "https://serious-company.ru/images/gallery-soil-diagram.webp",
+    "areaServed": [{ "@type": "AdministrativeArea", "name": "Южный федеральный округ" }, { "@type": "City", "name": "Краснодар" }],
+    "knowsAbout": ["инъектирование бетона", "гидроизоляция", "стабилизация грунта", "усиление фундамента"]
+  }
+  </script>
 </head>
+
 <body>
 
   <!-- Navigation -->
   <nav class="nav glass">
-    <a href="/" class="nav-logo">Граут<span>Про</span></a>
+    <a href="/" class="nav-logo">
+      Граут<span>Про</span>
+    </a>
     <ul class="nav-links">
-      <li><a href="#about">О технологии</a></li>
+      <li><a href="/#about">Технология</a></li>
       <li><a href="/shop">Магазин</a></li>
-      <li><a href="#services">Услуги</a></li>
-      <li><a href="#process">Процесс</a></li>
-      <li><a href="#pricing">Цены</a></li>
-      <li><a href="#gallery">Работы</a></li>
-      <li><a href="/contact">Контакты</a></li>
+      <li><a href="/#services">Услуги</a></li>
+      <li><a href="/#process">Процесс</a></li>
+      <li><a href="/#pricing">Цены</a></li>
+      <li><a href="/#gallery">Галерея</a></li>
+      <li><a href="/#contact">Контакты</a></li>
     </ul>
+    <a href="/account" class="theme-toggle nav-account-link" aria-label="Профиль">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
+      </svg>
+    </a>
+    <a href="/cart" class="theme-toggle nav-cart-link" aria-label="Корзина">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="9" cy="21" r="1" />
+        <circle cx="20" cy="21" r="1" />
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+      </svg>
+    </a>
     <button class="theme-toggle" id="themeToggle" aria-label="Переключить тему">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+      </svg>
     </button>
     <div class="menu-btn" id="menuBtn">
       <span></span><span></span><span></span>
@@ -34,13 +93,23 @@
 
   <!-- Mobile Menu -->
   <div class="mobile-menu" id="mobileMenu">
-    <button class="mobile-menu-close" id="menuClose">&times;</button>
     <a href="#about">Технология</a>
+    <a href="/shop">Магазин</a>
     <a href="#services">Услуги</a>
     <a href="#process">Процесс</a>
     <a href="#pricing">Цены</a>
-    <a href="#gallery">Работы</a>
-    <a href="/contact">Контакты</a>
+    <a href="#gallery">Галерея</a>
+    <a href="#reviews">Отзывы</a>
+    <a href="#contact">Контакты</a>
+    <a href="/account">Профиль</a>
+    <a href="/cart"><svg class="icon icon-inline" aria-hidden="true" focusable="false"
+        xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18" />
+        <path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25" />
+        <circle cx="18" cy="20" r="2" />
+        <circle cx="8" cy="20" r="2" />
+      </svg>Корзина</a>
   </div>
 
   <!-- Hero -->
@@ -48,11 +117,21 @@
     <div class="hero-bg"></div>
     <div class="hero-grid"></div>
     <div class="hero-content">
-      <div class="hero-tag">Краснодар и область</div>
+      <div class="hero-tag hero-tag--logo">
+        <img src="/images/logo.webp" alt="ГраутПро" class="hero-tag-logo">
+      </div>
       <h1>Инъектирование <span class="accent">бетона</span> и гидроизоляция</h1>
-      <p>Восстановление несущей способности конструкций без демонтажа. Заполнение трещин полимерными составами под давлением — надёжно, быстро, навсегда.</p>
+      <p>Восстановление несущей способности конструкций без демонтажа. Заполнение трещин полимерными составами под
+        давлением — надёжно, быстро, навсегда.</p>
       <div class="hero-buttons">
-        <a href="/shop" class="btn btn-primary">🛒 В магазин</a>
+        <a href="/shop" class="btn btn-primary"><svg class="icon icon-inline" aria-hidden="true" focusable="false"
+            xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18" />
+            <path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25" />
+            <circle cx="18" cy="20" r="2" />
+            <circle cx="8" cy="20" r="2" />
+          </svg>В магазин</a>
         <a href="#about" class="btn btn-secondary">Узнать больше</a>
       </div>
     </div>
@@ -63,12 +142,8 @@
     <div class="container">
       <div class="stats-grid glass" style="border-radius: 24px; padding: 48px 24px;">
         <div class="stat-item reveal">
-          <div class="stat-number" data-count="12" data-suffix="+">0+</div>
-          <div class="stat-label">лет опыта</div>
-        </div>
-        <div class="stat-item reveal">
-          <div class="stat-number" data-count="340" data-suffix="+">0+</div>
-          <div class="stat-label">объектов</div>
+          <div class="stat-number" data-count="5" data-suffix="+">0+</div>
+          <div class="stat-label">лет опыта в инъектировании</div>
         </div>
         <div class="stat-item reveal">
           <div class="stat-number" data-count="5" data-suffix="">0</div>
@@ -85,31 +160,78 @@
   <!-- About -->
   <section class="section" id="about">
     <div class="container">
-      <div class="section-header reveal">
+      <div class="section-header reveal" style="margin-bottom: 48px;">
         <div class="section-label">О технологии</div>
         <h2>Что такое <span style="color: var(--accent);">инъектирование</span></h2>
-        <p class="lead">Инъектирование — это заполнение трещин, швов и пустот в бетоне и кирпичной кладке полимерными составами под высоким давлением. Метод позволяет восстановить несущую способность конструкций без остановки эксплуатации объекта.</p>
+        <p class="lead">Два направления работ: восстановление бетонных конструкций и укрепление грунта под зданием.</p>
+      </div>
+      <div class="grid-2 tech-grid">
+        <article class="card glass tech-card reveal">
+          <div class="tech-card-tag">01 · Бетон</div>
+          <h3>Инъектирование <span>бетона</span></h3>
+          <p>Это заполнение трещин, швов и пустот в бетоне полимерными составами под высоким давлением. Метод позволяет
+            восстановить несущую способность конструкций без остановки эксплуатации объекта.</p>
+        </article>
+        <article class="card glass tech-card reveal">
+          <div class="tech-card-tag">02 · Грунт</div>
+          <h3>Инъектирование <span>грунта</span> <small>закрепление, стабилизация</small></h3>
+          <p>Повышение несущей способности грунта и подъём здания в проектное положение. Трещины в стене и фундаменте
+            сходятся — размер трещины уменьшается за счёт выравнивания дома.</p>
+        </article>
       </div>
       <div class="grid-2">
         <div class="card glass reveal">
-          <div class="card-icon">🔧</div>
+          <div class="card-icon"><svg class="icon" aria-hidden="true" focusable="false"
+              xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path
+                d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" />
+            </svg></div>
           <h3>Без демонтажа</h3>
-          <p>Работы проводятся без разрушения существующих конструкций. Нет пыли, шума и строительного мусора — объект продолжает функционировать в штатном режиме.</p>
+          <p>Работы проводятся без разрушения существующих конструкций. Нет пыли, шума и строительного мусора — объект
+            продолжает функционировать в штатном режиме.</p>
         </div>
         <div class="card glass reveal">
-          <div class="card-icon">💧</div>
+          <div class="card-icon"><svg class="icon" aria-hidden="true" focusable="false"
+              xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path
+                d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z" />
+              <path
+                d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97" />
+            </svg></div>
           <h3>Полная гидроизоляция</h3>
-          <p>Полимерные составы проникают в микротрещины до 0,1 мм, создавая монолитный водонепроницаемый барьер. Устраняется капиллярный подсос влаги.</p>
+          <p>Полимерные составы проникают в микротрещины до 0,1 мм, создавая монолитный водонепроницаемый барьер.
+            Устраняется капиллярный подсос влаги.</p>
         </div>
         <div class="card glass reveal">
-          <div class="card-icon">⏱️</div>
+          <div class="card-icon"><svg class="icon" aria-hidden="true" focusable="false"
+              xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="10" x2="14" y1="2" y2="2" />
+              <line x1="12" x2="15" y1="14" y2="11" />
+              <circle cx="12" cy="14" r="8" />
+            </svg></div>
           <h3>Минимальные сроки</h3>
-          <p>Большинство работ выполняется за 1–3 дня в зависимости от объёма. Не требуется предварительная подготовка или земляные работы.</p>
+          <p>Большинство работ выполняется за 1–3 дня в зависимости от объёма. Не требуется предварительная подготовка
+            или земляные работы.</p>
         </div>
         <div class="card glass reveal">
-          <div class="card-icon">🌡️</div>
+          <div class="card-icon"><svg class="icon" aria-hidden="true" focusable="false"
+              xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m10 20-1.25-2.5L6 18" />
+              <path d="M10 4 8.75 6.5 6 6" />
+              <path d="M10.585 15H10" />
+              <path d="M2 12h6.5L10 9" />
+              <path d="M20 14.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0z" />
+              <path d="m4 10 1.5 2L4 14" />
+              <path d="m7 21 3-6-1.5-3" />
+              <path d="m7 3 3 6h2" />
+            </svg></div>
           <h3>Круглогодично</h3>
-          <p>Технология не зависит от погодных условий. Работы проводятся при температуре от -10°C до +40°C в любой плоскости — от фундамента до потолка.</p>
+          <p>Технология не зависит от погодных условий. Работы проводятся при температуре от -10°C до +40°C в любой
+            плоскости — от фундамента до потолка.</p>
         </div>
       </div>
     </div>
@@ -123,38 +245,110 @@
       <div class="section-header reveal">
         <div class="section-label">Услуги</div>
         <h2>Комплексные <span style="color: var(--accent);">решения</span></h2>
-        <p class="lead">От диагностики до гарантированного результата — полный цикл работ по восстановлению и защите конструкций.</p>
+        <p class="lead">От диагностики до гарантированного результата — полный цикл работ по восстановлению и защите
+          конструкций.</p>
       </div>
       <div class="grid-3">
         <div class="card glass-strong reveal">
-          <div class="card-icon">🧱</div>
+          <div class="card-icon"><svg class="icon" aria-hidden="true" focusable="false"
+              xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m18 2 4 4" />
+              <path d="m17 7 3-3" />
+              <path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5" />
+              <path d="m9 11 4 4" />
+              <path d="m5 19-3 3" />
+              <path d="m14 4 6 6" />
+            </svg></div>
           <h3>Инъектирование трещин</h3>
-          <p>Заполнение трещин в бетоне эпоксидными и полиуретановыми составами. Восстановление монолитности и несущей способности конструкций любой сложности.</p>
+          <p>Заполнение трещин в бетоне эпоксидными и полиуретановыми составами. Восстановление монолитности и несущей
+            способности конструкций любой сложности.</p>
         </div>
         <div class="card glass-strong reveal">
-          <div class="card-icon">🏗️</div>
+          <div class="card-icon"><svg class="icon" aria-hidden="true" focusable="false"
+              xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 13v7a2 2 0 0 0 4 0" />
+              <path d="M12 2v2" />
+              <path d="M20.992 13a1 1 0 0 0 .97-1.274 10.284 10.284 0 0 0-19.923 0A1 1 0 0 0 3 13z" />
+            </svg></div>
           <h3>Гидроизоляция подвалов</h3>
-          <p>Защита подземных сооружений, паркингов и тоннелей от грунтовых вод. Инъекционная мембрана создаёт надёжный барьер на десятилетия.</p>
+          <p>Защита подземных сооружений, паркингов и тоннелей от грунтовых вод. Инъекционная мембрана создаёт надёжный
+            барьер на десятилетия.</p>
         </div>
         <div class="card glass-strong reveal">
-          <div class="card-icon">🔩</div>
+          <div class="card-icon"><svg class="icon" aria-hidden="true" focusable="false"
+              xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="18" height="18" x="3" y="3" rx="2" />
+              <path d="M12 9v6" />
+              <path d="M16 15v6" />
+              <path d="M16 3v6" />
+              <path d="M3 15h18" />
+              <path d="M3 9h18" />
+              <path d="M8 15v6" />
+              <path d="M8 3v6" />
+            </svg></div>
           <h3>Усиление фундамента</h3>
-          <p>Консолидация грунта и восстановление эксплуатационных свойств фундаментов. Работа с «холодными швами» и деформационными зонами.</p>
+          <p>Консолидация грунта и восстановление эксплуатационных свойств фундаментов методом инъектирования.</p>
         </div>
         <div class="card glass-strong reveal">
-          <div class="card-icon">🌀</div>
+          <div class="card-icon"><svg class="icon" aria-hidden="true" focusable="false"
+              xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 10.01h.01" />
+              <path d="M10 14.01h.01" />
+              <path d="M14 10.01h.01" />
+              <path d="M14 14.01h.01" />
+              <path d="M18 6v12" />
+              <path d="M6 6v12" />
+              <rect x="2" y="6" width="20" height="12" rx="2" />
+            </svg></div>
           <h3>Герметизация швов</h3>
-          <p>Устройство герметизации деформационных и конструкционных швов гидроструктурными составами с регулируемой жизнеспособностью.</p>
+          <p>Устройство герметизации деформационных и конструкционных швов гидроструктурными составами с регулируемой
+            жизнеспособностью.</p>
         </div>
         <div class="card glass-strong reveal">
-          <div class="card-icon">⚙️</div>
+          <div class="card-icon"><svg class="icon" aria-hidden="true" focusable="false"
+              xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 18a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H5a3 3 0 0 1-3-3 1 1 0 0 1 1-1z" />
+              <path
+                d="M13 10H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1l-.81 3.242a1 1 0 0 1-.97.758H8" />
+              <path d="M14 4h3a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-3" />
+              <path d="M18 6h4" />
+              <path d="m5 10-2 8" />
+              <path d="m7 18 2-8" />
+            </svg></div>
           <h3>Алмазное бурение</h3>
-          <p>Подготовка отверстий под инъекторы (пакеры) с точным соблюдением угла 45°. Диаметр от 16 до 24 мм, глубина по расчёту.</p>
+          <p>Подготовка отверстий под инъекторы (пакеры) с точным соблюдением угла 45°. Диаметр от 16 до 24 мм, глубина
+            по расчёту.</p>
         </div>
         <div class="card glass-strong reveal">
-          <div class="card-icon">📋</div>
+          <div class="card-icon"><svg class="icon" aria-hidden="true" focusable="false"
+              xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path
+                d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
+              <path d="M20 2v4" />
+              <path d="M22 4h-4" />
+              <circle cx="4" cy="20" r="2" />
+            </svg></div>
+          <h3>Шлифовка поверхности</h3>
+          <p>Механическая шлифовка бетонных и цементных поверхностей: удаление наплывов, старых покрытий и цементного
+            молочка, подготовка основания под финишную отделку.</p>
+        </div>
+        <div class="card glass-strong reveal">
+          <div class="card-icon"><svg class="icon" aria-hidden="true" focusable="false"
+              xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+              <path d="m9 14 2 2 4-4" />
+            </svg></div>
           <h3>Диагностика и расчёт</h3>
-          <p>Выезд на объект, оценка состояния конструкций, расчёт глубины скважин и объёма раствора. Подготовка технического заключения.</p>
+          <p>Выезд на объект, оценка состояния конструкций, расчёт глубины скважин и объёма раствора. Подготовка
+            технического заключения.</p>
         </div>
       </div>
     </div>
@@ -173,7 +367,8 @@
       <div class="process-grid glass" style="border-radius: 24px;">
         <div class="process-step reveal">
           <h4>Диагностика</h4>
-          <p>Бесплатный выезд специалиста на объект в Краснодаре и области. Оценка повреждений, фотофиксация, замеры.</p>
+          <p>Выезд специалиста на объект в Краснодаре и области. Оценка повреждений, фотофиксация, замеры.
+          </p>
         </div>
         <div class="process-step reveal">
           <h4>Проектирование</h4>
@@ -185,7 +380,8 @@
         </div>
         <div class="process-step reveal">
           <h4>Инъектирование</h4>
-          <p>Нагнетание раствора под давлением через насосное оборудование. Контроль выхода состава из соседних пакеров.</p>
+          <p>Нагнетание раствора под давлением через насосное оборудование. Контроль выхода состава из соседних пакеров.
+          </p>
         </div>
         <div class="process-step reveal">
           <h4>Завершение</h4>
@@ -203,44 +399,47 @@
       <div class="section-header reveal">
         <div class="section-label">Стоимость</div>
         <h2>Прозрачные <span style="color: var(--accent);">цены</span></h2>
-        <p class="lead">Финальная стоимость определяется после диагностики на объекте. Все расходы — в смете, без скрытых платежей.</p>
+        <p class="lead">Финальная стоимость определяется после диагностики на объекте. Все расходы — в смете, без
+          скрытых платежей.</p>
       </div>
       <div class="pricing-grid">
         <div class="card glass pricing-card reveal">
           <h3>Инъектирование трещин</h3>
-          <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 8px;">Восстановление несущей способности</p>
-          <div class="price">по расчёту<span> / м.пог.</span></div>
+          <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 8px;">Восстановление несущей
+            способности</p>
+          <div class="price price--quote">По замеру<span>стоимость — после осмотра объекта</span></div>
           <ul>
-            <li>Ширина раскрытия от 0,10 мм</li>
+            <li>Ширина раскрытия от 0,1 мм</li>
             <li>Эпоксидные и полиуретановые составы</li>
             <li>Гарантия 5 лет</li>
             <li>Работа в любой плоскости</li>
           </ul>
-          <a href="/contact" class="btn btn-secondary" style="width: 100%; justify-content: center;">Заказать расчёт</a>
+          <a href="#contact" class="btn btn-secondary" style="width: 100%; justify-content: center;">Заказать расчёт</a>
         </div>
         <div class="card glass pricing-card featured reveal">
-          <h3>Гидроизоляция мембрана</h3>
-          <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 8px;">Восстановление наружной гидроизоляции</p>
-          <div class="price">по расчёту<span> / м²</span></div>
+          <h3>Гидроизоляционная мембрана</h3>
+          <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 8px;">Восстановление наружной
+            гидроизоляции</p>
+          <div class="price price--quote">По замеру<span>стоимость — после осмотра объекта</span></div>
           <ul>
             <li>Заглубленные конструкции</li>
             <li>Инъецирование прилегающего грунта</li>
             <li>Гарантия 7 лет</li>
             <li>Опытные работы на объекте</li>
           </ul>
-          <a href="/contact" class="btn btn-primary" style="width: 100%; justify-content: center;">Заказать расчёт</a>
+          <a href="#contact" class="btn btn-primary" style="width: 100%; justify-content: center;">Заказать расчёт</a>
         </div>
         <div class="card glass pricing-card reveal">
           <h3>Усиление кирпичной кладки</h3>
           <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 8px;">Спиральный анкер RSA-bar</p>
-          <div class="price">по расчёту<span> / м.пог.</span></div>
+          <div class="price price--quote">По замеру<span>стоимость — после осмотра объекта</span></div>
           <ul>
             <li>Устранение трещин в кладке</li>
             <li>Армирование конструкций</li>
             <li>Гарантия 5 лет</li>
             <li>Минимальное вмешательство</li>
           </ul>
-          <a href="/contact" class="btn btn-secondary" style="width: 100%; justify-content: center;">Заказать расчёт</a>
+          <a href="#contact" class="btn btn-secondary" style="width: 100%; justify-content: center;">Заказать расчёт</a>
         </div>
       </div>
     </div>
@@ -249,85 +448,242 @@
   <div class="divider"></div>
 
   <!-- Gallery -->
-  <section class="section" id="gallery">
+  <section class="section" id="estimate">
     <div class="container">
       <div class="section-header reveal">
-        <div class="section-label">Галерея</div>
-        <h2>Технология в <span style="color: var(--accent);">деталях</span></h2>
-        <p class="lead">Оборудование, схемы и процесс выполнения работ. Раздел будет дополнен фотографиями с реальных объектов.</p>
+        <div class="section-label">Смета</div>
+        <h2>Ориентировочный <span style="color: var(--accent);">расчёт</span></h2>
+        <p class="lead">Отметьте нужные работы — покажем порядок суммы по прайсу за единицу (пог. м, м², ввод). Объём и точная стоимость фиксируются после выезда и замера на объекте.</p>
       </div>
-      <div class="gallery-grid">
-        <div class="gallery-item reveal">
-          <img src="/images/image.png" alt="Алмазная резка бетона" loading="lazy">
-        </div>
-        <div class="gallery-item reveal">
-          <img src="/images/image(1).png" alt="Схема инъектирования трещин" loading="lazy">
-        </div>
-        <div class="gallery-item reveal">
-          <img src="/images/image(2).png" alt="Инъекционный насос" loading="lazy">
-        </div>
-        <div class="gallery-item reveal">
-          <img src="/images/image(3).png" alt="Проникновение состава в трещину" loading="lazy">
-        </div>
-        <div class="gallery-item reveal">
-          <img src="/images/image(4).png" alt="Полное заполнение трещины" loading="lazy">
-        </div>
-        <div class="gallery-item reveal">
-          <img src="/images/image(5).png" alt="Плита с пакерами" loading="lazy">
-        </div>
-        <div class="gallery-item reveal" style="background: linear-gradient(135deg, var(--surface-solid), var(--bg)); display: flex; align-items: center; justify-content: center;">
-          <span style="color: var(--muted); font-size: 0.9rem; font-weight: 500;">📷 Фото объекта — скоро</span>
-        </div>
-        <div class="gallery-item reveal" style="background: linear-gradient(135deg, var(--surface-solid), var(--bg)); display: flex; align-items: center; justify-content: center;">
-          <span style="color: var(--muted); font-size: 0.9rem; font-weight: 500;">📷 Фото объекта — скоро</span>
+      <div class="estimate-box glass reveal">
+        <div id="estimate-items" class="estimate-items">Загрузка прайса...</div>
+        <div class="estimate-summary">
+          <div class="estimate-row"><span>Работы по прайсу</span><span id="estimate-works">0 ₽</span></div>
+          <div class="estimate-row estimate-row--total"><span>Ориентировочно от</span><span id="estimate-total">0 ₽</span></div>
+          <p class="estimate-note">Расчёт предварительный: итог зависит от состояния конструкций, доступа к объекту и расхода состава. После замера вы получите смету с фиксированной ценой.</p>
+          <button type="button" class="btn btn-primary" id="estimate-request" style="width:100%;justify-content:center">Заказать замер</button>
+          <form class="estimate-form" id="estimate-form" hidden>
+            <p class="estimate-form-head">Заявка на замер <span id="estimate-chosen"></span></p>
+            <div class="form-group">
+              <label class="field-label" for="estimate-name">Ваше имя</label>
+              <input type="text" id="estimate-name" placeholder="Ваше имя" required minlength="2" maxlength="120" autocomplete="name">
+            </div>
+            <div class="form-group">
+              <label class="field-label" for="estimate-phone">Телефон</label>
+              <input type="tel" id="estimate-phone" placeholder="Телефон для связи" required maxlength="32" autocomplete="tel">
+            </div>
+            <div class="form-group">
+              <label class="field-label" for="estimate-email">Email (необязательно)</label>
+              <input type="email" id="estimate-email" placeholder="Email — пришлём смету письмом" maxlength="254" autocomplete="email">
+            </div>
+            <div class="form-group">
+              <label class="field-label" for="estimate-comment">Адрес объекта и детали</label>
+              <textarea id="estimate-comment" placeholder="Адрес объекта, этаж, сроки, что беспокоит" maxlength="3000"></textarea>
+            </div>
+            <div class="hp-field" aria-hidden="true"><label>Сайт компании<input type="text" id="estimate-website" tabindex="-1" autocomplete="off"></label></div>
+            <label class="consent-checkbox"><input type="checkbox" id="estimate-consent" required> Согласен с <a href="/privacy-policy">политикой конфиденциальности</a></label>
+            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">Отправить заявку на замер</button>
+            <p class="contact-form-status" id="estimate-status" role="status" aria-live="polite"></p>
+          </form>
         </div>
       </div>
     </div>
   </section>
 
+  <section class="section" id="gallery">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-label">Галерея</div>
+        <h2>Технология в <span style="color: var(--accent);">деталях</span></h2>
+        <p class="lead">Оборудование, схемы и процесс выполнения работ на реальных объектах.</p>
+      </div>
+      <div class="gallery-grid">
+        <div class="gallery-item reveal">
+          <img src="images/gallery-samples.webp" alt="Образцы материалов для инъектирования" loading="lazy">
+        </div>
+        <div class="gallery-item reveal">
+          <img src="images/gallery-warehouse.webp" alt="Склад оборудования и материалов" loading="lazy">
+        </div>
+        <div class="gallery-item reveal">
+          <img src="images/gallery-ceiling-work.webp" alt="Инъектирование трещины в перекрытии" loading="lazy">
+        </div>
+        <div class="gallery-item reveal">
+          <img src="images/gallery-soil-diagram.webp" alt="Схема инъектирования и стабилизации грунта" loading="lazy">
+        </div>
+        <div class="gallery-item reveal">
+          <img src="images/gallery-soil-binding.webp" alt="Показательный опыт: полимерный состав связывает песок в монолит" loading="lazy">
+        </div>
+        <div class="gallery-item reveal">
+          <img src="images/gallery-conference.webp" alt="Отраслевая конференция РосПро 2026" loading="lazy">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="lightbox" id="lightbox" hidden>
+    <button class="lightbox-close" id="lightbox-close" type="button" aria-label="Закрыть галерею"><svg class="icon"
+        aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+        stroke-linejoin="round">
+        <path d="M18 6 6 18" />
+        <path d="m6 6 12 12" />
+      </svg></button>
+    <button class="lightbox-nav lightbox-prev" id="lightbox-prev" type="button" aria-label="Предыдущее фото">‹</button>
+    <figure class="lightbox-figure">
+      <img id="lightbox-image" src="" alt="">
+      <figcaption id="lightbox-caption"></figcaption>
+    </figure>
+    <button class="lightbox-nav lightbox-next" id="lightbox-next" type="button" aria-label="Следующее фото">›</button>
+    <div class="lightbox-counter" id="lightbox-counter"></div>
+  </div>
+
   <div class="divider"></div>
 
   <!-- Contact -->
+  <section class="section" id="reviews">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-label">Отзывы</div>
+        <h2>Что говорят <span style="color: var(--accent);">заказчики</span></h2>
+        <p class="lead">Отзывы публикуются после проверки. Здесь же можно предложить идею — что добавить в услуги или на сайт.</p>
+      </div>
+      <div class="reviews-grid reveal" id="reviews-list"></div>
+      <form class="review-form glass reveal" id="review-form">
+        <div class="review-form-head">
+          <h3>Оставить отзыв или предложение</h3>
+          <div class="review-kind" role="radiogroup" aria-label="Тип сообщения">
+            <label><input type="radio" name="review-kind" value="review" checked> Отзыв</label>
+            <label><input type="radio" name="review-kind" value="suggestion"> Предложение</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="field-label" for="review-name">Ваше имя</label>
+          <input type="text" id="review-name" placeholder="Ваше имя" required minlength="2" maxlength="120" autocomplete="name">
+        </div>
+        <div class="form-group" id="review-rating-group">
+          <span class="review-rating-label">Оценка</span>
+          <div class="review-rating" id="review-rating">
+            <button type="button" class="review-star" data-value="1" aria-label="1 из 5">★</button>
+            <button type="button" class="review-star" data-value="2" aria-label="2 из 5">★</button>
+            <button type="button" class="review-star" data-value="3" aria-label="3 из 5">★</button>
+            <button type="button" class="review-star" data-value="4" aria-label="4 из 5">★</button>
+            <button type="button" class="review-star" data-value="5" aria-label="5 из 5">★</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="field-label" for="review-message">Текст</label>
+          <textarea id="review-message" placeholder="Что понравилось, что стоит улучшить..." required minlength="5" maxlength="3000"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="field-label" for="review-contact">Телефон или email (необязательно)</label>
+          <input type="text" id="review-contact" placeholder="Телефон или email — если нужен ответ" maxlength="254">
+        </div>
+        <div class="hp-field" aria-hidden="true"><label>Сайт компании<input type="text" id="review-website" tabindex="-1" autocomplete="off"></label></div>
+        <label class="consent-checkbox"><input type="checkbox" id="review-consent" required> Согласен с <a href="/privacy-policy">политикой конфиденциальности</a></label>
+        <button type="submit" class="btn btn-secondary" style="width:100%;justify-content:center">Отправить</button>
+        <p class="contact-form-status" id="review-status" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </section>
+
   <section class="section" id="contact">
     <div class="container">
       <div class="section-header reveal">
         <div class="section-label">Контакты</div>
         <h2>Свяжитесь с <span style="color: var(--accent);">нами</span></h2>
-        <p class="lead">Бесплатная консультация и выезд на объект в Краснодаре и Краснодарском крае.</p>
+        <p class="lead">Консультация и выезд на объект в Краснодаре и Краснодарском крае.</p>
       </div>
       <div class="contact-grid">
         <div class="contact-info reveal">
           <h3>Реквизиты и связь</h3>
           <div class="contact-item">
-            <div class="contact-item-icon">📞</div>
+            <div class="contact-item-icon"><svg class="icon" aria-hidden="true" focusable="false"
+                xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path
+                  d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" />
+              </svg></div>
             <div>
               <h4>Телефон</h4>
-              <p>8 905 405-31-33</p>
+              <a class="contact-link" id="contact-phone-link" href="tel:+79054053133">+7 905 405-31-33</a>
             </div>
           </div>
           <div class="contact-item">
-            <div class="contact-item-icon">✉️</div>
+            <div class="contact-item-icon"><svg class="icon" aria-hidden="true" focusable="false"
+                xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" />
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+              </svg></div>
             <div>
               <h4>Email</h4>
-              <p>Dmitriy.mikhaylyuk.standart@outlook.com</p>
+              <!-- TODO: Replace CONTACT_EMAIL with the verified business email before publishing. -->
+              <a class="contact-link" id="contact-email-link" href="mailto:info@groutpro.ru">info@groutpro.ru</a>
             </div>
           </div>
           <div class="contact-item contact-item-address">
-            <div class="contact-item-icon">📍</div>
+            <div class="contact-item-icon"><svg class="icon" aria-hidden="true" focusable="false"
+                xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path
+                  d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+                <circle cx="12" cy="10" r="3" />
+              </svg></div>
             <div>
               <h4>Адрес</h4>
-              <p>Краснодар, Краснодарский край</p>
+              <a class="contact-link" id="contact-address-link" href="https://yandex.ru/maps/?text=%D0%9A%D1%80%D0%B0%D1%81%D0%BD%D0%BE%D0%B4%D0%B0%D1%80%2C%20%D1%83%D0%BB%D0%B8%D1%86%D0%B0%20%D0%9D%D0%BE%D0%B2%D0%BE%D1%80%D0%BE%D1%81%D1%81%D0%B8%D0%B9%D1%81%D0%BA%D0%B0%D1%8F%2C%2051%2F2" target="_blank"
+                rel="noopener noreferrer">Краснодар, ул. Новороссийская, 51/2</a>
+              <button class="region-toggle" id="region-toggle" type="button" aria-expanded="false"
+                aria-controls="region-map">
+                <span>Регион на карте</span>
+                <span class="region-toggle-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"
+                    focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg></span>
+              </button>
+              <div class="region-map" id="region-map">
+                <div class="map-placeholder" id="map-placeholder" role="status">
+                  <svg class="icon" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24"
+                    height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                      d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                  <p>Краснодар, ул. Новороссийская, 51/2</p>
+                </div>
+                <a class="map-external-link" id="contact-map-link" href="https://yandex.ru/maps/?text=%D0%9A%D1%80%D0%B0%D1%81%D0%BD%D0%BE%D0%B4%D0%B0%D1%80%2C%20%D1%83%D0%BB%D0%B8%D1%86%D0%B0%20%D0%9D%D0%BE%D0%B2%D0%BE%D1%80%D0%BE%D1%81%D1%81%D0%B8%D0%B9%D1%81%D0%BA%D0%B0%D1%8F%2C%2051%2F2" target="_blank"
+                  rel="noopener noreferrer">Открыть в Яндекс Картах <svg class="icon" aria-hidden="true"
+                    focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M7 7h10v10" />
+                    <path d="M7 17 17 7" />
+                  </svg></a>
+              </div>
             </div>
           </div>
           <div class="contact-item">
-            <div class="contact-item-icon">💬</div>
+            <div class="contact-item-icon"><svg class="icon" aria-hidden="true" focusable="false"
+                xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path
+                  d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" />
+              </svg></div>
             <div>
               <h4>Мессенджеры</h4>
-              <p>WhatsApp / Telegram</p>
+              <p><a class="contact-link" href="tel:+79054053133">+7 905 405-31-33</a> (МАХ)</p>
             </div>
           </div>
           <div class="contact-item">
-            <div class="contact-item-icon">🕐</div>
+            <div class="contact-item-icon"><svg class="icon" aria-hidden="true" focusable="false"
+                xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v6l4 2" />
+              </svg></div>
             <div>
               <h4>Режим работы</h4>
               <p>Пн–Сб: 08:00 – 20:00</p>
@@ -335,12 +691,30 @@
           </div>
         </div>
         <div class="reveal">
-          <div class="contact-form glass" style="padding: 40px; border-radius: 24px;">
-            <h3>Расскажите о задаче</h3>
-            <p style="color:var(--text-secondary);margin:16px 0 28px">Перейдите к короткой форме заявки. Укажите объект и удобный способ связи — мы уточним детали и предложим следующий шаг.</p>
-            <a href="/contact" class="btn btn-primary" style="width:100%;justify-content:center">Оставить заявку</a>
-            <a href="tel:+79054053133" class="btn btn-secondary" style="width:100%;justify-content:center;margin-top:12px">Позвонить: 8 905 405-31-33</a>
-          </div>
+          <form class="contact-form glass" id="contact-form" style="padding: 40px; border-radius: 24px;" novalidate>
+            <div class="form-group">
+              <label class="field-label" for="contact-name">Ваше имя</label><input type="text" id="contact-name" placeholder="Ваше имя" required minlength="2" maxlength="120"
+                autocomplete="name">
+            </div>
+            <div class="form-group">
+              <label class="field-label" for="contact-phone">Телефон</label><input type="tel" id="contact-phone" placeholder="Телефон" required maxlength="32" autocomplete="tel">
+            </div>
+            <div class="form-group">
+              <label class="field-label" for="contact-email">Email (необязательно)</label><input type="email" id="contact-email" placeholder="Email (необязательно)" maxlength="254"
+                autocomplete="email">
+            </div>
+            <div class="form-group">
+              <label class="field-label" for="contact-message">Опишите задачу или объект</label><textarea id="contact-message" placeholder="Опишите задачу или объект..." maxlength="3000"></textarea>
+            </div>
+            <div class="hp-field" aria-hidden="true"><label>Сайт компании<input type="text" id="contact-website"
+                  tabindex="-1" autocomplete="off"></label></div>
+            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Отправить
+              заявку</button>
+            <p class="contact-form-status" id="contact-form-status" role="status" aria-live="polite"></p>
+            <p style="font-size: 0.75rem; color: var(--muted); text-align: center; margin-top: 16px;">Нажимая кнопку, вы
+              соглашаетесь с <a href="/privacy-policy"
+                style="color:var(--text-secondary);text-decoration:underline">политикой конфиденциальности</a></p>
+          </form>
         </div>
       </div>
     </div>
@@ -351,7 +725,8 @@
     <div class="footer-grid">
       <div>
         <div class="footer-brand">Граут<span>Про</span></div>
-        <p class="footer-desc">Профессиональное инъектирование бетона и гидроизоляция в Краснодаре и Краснодарском крае. Восстановление конструкций без демонтажа.</p>
+        <p class="footer-desc">Профессиональное инъектирование бетона и гидроизоляция в Краснодаре и Краснодарском крае.
+          Восстановление конструкций без демонтажа.</p>
       </div>
       <div>
         <h4>Услуги</h4>
@@ -368,15 +743,16 @@
           <li><a href="#about">Технология</a></li>
           <li><a href="#process">Процесс работы</a></li>
           <li><a href="#gallery">Галерея</a></li>
-          <li><a href="/contact">Контакты</a></li>
+          <li><a href="#contact">Контакты</a></li>
+          <li><a href="/privacy-policy">Политика конфиденциальности</a></li>
         </ul>
       </div>
       <div>
         <h4>Контакты</h4>
         <ul class="footer-links">
-          <li><a href="tel:+79054053133">8 905 405-31-33</a></li>
-          <li><a href="mailto:Dmitriy.mikhaylyuk.standart@outlook.com">Dmitriy.mikhaylyuk.standart@outlook.com</a></li>
-          <li><a href="/contact">Краснодар, Краснодарский край</a></li>
+          <li><a href="tel:+79054053133">+7 905 405-31-33</a></li>
+          <li><a href="mailto:info@groutpro.ru">info@groutpro.ru</a></li>
+          <li><a href="/#contact">Краснодар, ул. Новороссийская, 51/2</a></li>
         </ul>
       </div>
     </div>
@@ -388,4 +764,5 @@
 
   <script src="/js/main.js"></script>
 </body>
+
 </html>

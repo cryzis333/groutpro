@@ -28,6 +28,7 @@ struct DiscountRow {
 pub async fn create_pending_order(
     state: &AppState,
     req: &CreateOrderRequest,
+    payment_method: &str,
 ) -> Result<Order, AppError> {
     validate_order_request(req)?;
 
@@ -48,6 +49,13 @@ pub async fn create_pending_order(
         .await?
         .ok_or(AppError::NotFound)?;
 
+        if product.price <= 0 {
+            // «Цена по запросу»: такую позицию считают по объекту, в заказ она не идёт
+            return Err(AppError::Validation(format!(
+                "«{}» рассчитывается по запросу — оставьте заявку, посчитаем по объекту",
+                product.title
+            )));
+        }
         if product.stock < item.quantity {
             return Err(AppError::Validation(format!(
                 "Недостаточно товара «{}» на складе",
@@ -55,14 +63,12 @@ pub async fn create_pending_order(
             )));
         }
 
-        // Stock is decremented only after YooKassa confirms payment (see
-        // payments::yookassa_webhook). This keeps abandoned or cancelled
-        // payment attempts from consuming inventory.
+        // Registered-user pricing is enabled only after checkout receives a verified session.
         let discount = if registered_customer {
             sqlx::query_as::<_, DiscountRow>(
                 "SELECT percent_bps, CASE WHEN product_id = $1 THEN 'product' ELSE 'category' END AS source
                  FROM discounts WHERE is_active = TRUE AND is_registered_only = TRUE
-                 AND (product_id = $1 OR category = $2)
+                 AND (product_id = $1 OR LOWER(TRIM(category)) = LOWER(TRIM($2)))
                  AND (starts_at IS NULL OR starts_at <= NOW()) AND (ends_at IS NULL OR ends_at > NOW())
                  ORDER BY percent_bps DESC LIMIT 1"
             )
@@ -73,7 +79,10 @@ pub async fn create_pending_order(
         } else {
             None
         };
-        let final_price = final_price_for(product.price, discount.as_ref());
+        let final_price = discount
+            .as_ref()
+            .map(|d| product.price * (10_000 - d.percent_bps) as i64 / 10_000)
+            .unwrap_or(product.price);
         let line_total = final_price
             .checked_mul(item.quantity as i64)
             .ok_or_else(|| AppError::Validation("Сумма заказа слишком велика".to_string()))?;
@@ -88,7 +97,7 @@ pub async fn create_pending_order(
         "GP-{}",
         Uuid::new_v4().simple().to_string()[..8].to_uppercase()
     );
-    let order = insert_order(&mut tx, req, total, &public_number, customer_id).await?;
+    let order = insert_order(&mut tx, req, total, &public_number, customer_id, payment_method).await?;
 
     for (product, quantity, discount) in line_items {
         sqlx::query(
@@ -100,7 +109,7 @@ pub async fn create_pending_order(
         .bind(product.id)
         .bind(quantity)
         .bind(product.price)
-        .bind(&product.title)
+        .bind(product.title)
         .bind(product.price)
         .bind(final_price_for(product.price, discount.as_ref()))
         .bind(discount.as_ref().map(|d| d.percent_bps).unwrap_or(0))
@@ -125,12 +134,13 @@ async fn insert_order(
     total: i64,
     public_number: &str,
     customer_id: Option<Uuid>,
+    payment_method: &str,
 ) -> Result<Order, AppError> {
     Ok(sqlx::query_as::<_, Order>(
         "INSERT INTO orders (
             customer_id, customer_name, customer_phone, customer_email, customer_address,
-            total_amount, status, public_number
-         ) VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
+            total_amount, status, public_number, payment_method, company_name, company_inn
+         ) VALUES ($1, $2, $3, $4, $5, $6, 'pending_payment', $7, $8, $9, $10)
          RETURNING *",
     )
     .bind(customer_id)
@@ -150,11 +160,24 @@ async fn insert_order(
     )
     .bind(total)
     .bind(public_number)
+    .bind(payment_method)
+    .bind(req.company_name.as_deref().map(str::trim).filter(|v| !v.is_empty()))
+    .bind(req.company_inn.as_deref().map(str::trim).filter(|v| !v.is_empty()))
     .fetch_one(&mut **tx)
     .await?)
 }
 
 fn validate_order_request(req: &CreateOrderRequest) -> Result<(), AppError> {
+    if req.website.as_deref().is_some_and(|value| !value.trim().is_empty()) {
+        return Err(AppError::Validation(
+            "Проверьте форму и попробуйте снова".to_string(),
+        ));
+    }
+    if !req.consent {
+        return Err(AppError::Validation(
+            "Подтвердите согласие с политикой конфиденциальности".to_string(),
+        ));
+    }
     if req.customer_name.trim().len() < 2 || req.customer_name.trim().len() > 120 {
         return Err(AppError::Validation(
             "Укажите имя от 2 до 120 символов".to_string(),

@@ -11,13 +11,12 @@ pub async fn create_order(
     if let Ok(user) = crate::handlers::customer_auth::current_customer(&state, &headers).await {
         req.customer_id = Some(user.id);
     }
-    Ok(Json(create_pending_order(&state, &req).await?))
+    Ok(Json(create_pending_order(&state, &req, "sbp").await?))
 }
 
 pub async fn list_orders(State(state): State<AppState>) -> Result<Json<Vec<Order>>, AppError> {
-    Ok(Json(
-        sqlx::query_as::<_, Order>("SELECT * FROM orders ORDER BY created_at DESC LIMIT 500")
-            .fetch_all(&state.pool)
-            .await?,
-    ))
+    let orders = sqlx::query_as::<_, Order>("SELECT * FROM orders ORDER BY created_at DESC")
+        .fetch_all(&state.pool)
+        .await?;
+    Ok(Json(orders))
 }

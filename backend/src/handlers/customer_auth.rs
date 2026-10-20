@@ -12,7 +12,10 @@ use uuid::Uuid;
 
 use crate::{
     error::AppError,
-    models::{CustomerLoginRequest, CustomerOrder, CustomerProfile, CustomerRegisterRequest},
+    models::{
+        CustomerLoginRequest, CustomerOrder, CustomerProfile, CustomerRegisterRequest,
+        UpdateProfileRequest,
+    },
     state::AppState,
 };
 
@@ -32,6 +35,17 @@ pub async fn register(
     State(state): State<AppState>,
     Json(req): Json<CustomerRegisterRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    if req.website.as_deref().is_some_and(|value| !value.trim().is_empty()) {
+        return Err(AppError::Validation(
+            "Проверьте форму и попробуйте снова".to_string(),
+        ));
+    }
+    if !req.consent {
+        return Err(AppError::Validation(
+            "Подтвердите согласие с политикой конфиденциальности".to_string(),
+        ));
+    }
+
     let name = req.name.trim();
     let email = req.email.trim().to_lowercase();
     if name.len() < 2
@@ -53,7 +67,7 @@ pub async fn register(
     let user = sqlx::query_as::<_, CustomerProfile>(
         "INSERT INTO users (email, password_hash, display_name)
          VALUES ($1, $2, $3)
-         RETURNING id, email, display_name",
+         RETURNING id, email, display_name, phone, address",
     )
     .bind(&email)
     .bind(password_hash)
@@ -92,15 +106,14 @@ pub async fn login(
         return Err(AppError::Unauthorized);
     }
 
-    session_response(
-        &state,
-        CustomerProfile {
-            id: user.id,
-            email: user.email,
-            display_name: user.display_name,
-        },
+    let profile = sqlx::query_as::<_, CustomerProfile>(
+        "SELECT id, email, display_name, phone, address FROM users WHERE id = $1",
     )
-    .await
+    .bind(user.id)
+    .fetch_one(&state.pool)
+    .await?;
+
+    session_response(&state, profile).await
 }
 
 pub async fn logout(
@@ -128,6 +141,40 @@ pub async fn me(
     Ok(Json(current_customer(&state, &headers).await?))
 }
 
+pub async fn update_profile(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Json(req): Json<UpdateProfileRequest>,
+) -> Result<Json<CustomerProfile>, AppError> {
+    let current = current_customer(&state, &headers).await?;
+
+    let name = req.display_name.trim();
+    if name.is_empty() || name.len() > 120 {
+        return Err(AppError::Validation("Проверьте имя".to_string()));
+    }
+    let phone = req.phone.as_deref().map(str::trim).filter(|v| !v.is_empty());
+    if phone.is_some_and(|v| v.len() > 32) {
+        return Err(AppError::Validation("Проверьте телефон".to_string()));
+    }
+    let address = req.address.as_deref().map(str::trim).filter(|v| !v.is_empty());
+    if address.is_some_and(|v| v.len() > 500) {
+        return Err(AppError::Validation("Слишком длинный адрес".to_string()));
+    }
+
+    let updated = sqlx::query_as::<_, CustomerProfile>(
+        "UPDATE users SET display_name = $1, phone = $2, address = $3, updated_at = NOW()
+         WHERE id = $4 RETURNING id, email, display_name, phone, address",
+    )
+    .bind(name)
+    .bind(phone)
+    .bind(address)
+    .bind(current.id)
+    .fetch_one(&state.pool)
+    .await?;
+
+    Ok(Json(updated))
+}
+
 pub async fn list_my_orders(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
@@ -149,7 +196,7 @@ pub async fn current_customer(
 ) -> Result<CustomerProfile, AppError> {
     let token = session_token(headers).ok_or(AppError::Unauthorized)?;
     let user = sqlx::query_as::<_, CustomerProfile>(
-        "SELECT u.id, u.email, u.display_name FROM user_sessions s
+        "SELECT u.id, u.email, u.display_name, u.phone, u.address FROM user_sessions s
          JOIN users u ON u.id = s.user_id
          WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > NOW() AND u.role = 'customer'",
     )

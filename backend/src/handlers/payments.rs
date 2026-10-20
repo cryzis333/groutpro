@@ -2,7 +2,8 @@ use crate::{
     error::AppError,
     models::*,
     services::{
-        checkout::create_pending_order, email::EmailService, telegram::TelegramService,
+        checkout::create_pending_order,
+        notify::{Notification, Notifier},
         yookassa::YookassaService,
     },
     state::AppState,
@@ -15,19 +16,19 @@ pub async fn create_payment(
     headers: HeaderMap,
     Json(mut req): Json<CreateOrderRequest>,
 ) -> Result<Json<Value>, AppError> {
-    if !state.config.payments_enabled() {
-        return Err(AppError::Validation(
-            "Онлайн-оплата пока не настроена".into(),
-        ));
-    }
     if let Ok(user) = crate::handlers::customer_auth::current_customer(&state, &headers).await {
         req.customer_id = Some(user.id);
     }
-    let order = create_pending_order(&state, &req).await?;
+    let order = create_pending_order(&state, &req, "sbp").await?;
     let yookassa = YookassaService::new(&state.config);
     let return_url = format!(
-        "{}/cart?success=1&order={}",
-        state.config.site_url, order.public_number
+        "{}/cart.html?success=1&order={}",
+        state
+            .config
+            .site_url
+            .as_deref()
+            .unwrap_or("https://yourdomain.ru"),
+        order.public_number
     );
     let payment = yookassa
         .create_payment(
@@ -36,14 +37,27 @@ pub async fn create_payment(
             &format!("Заказ {}", order.public_number),
             &return_url,
         )
-        .await
-        .map_err(|error| AppError::Internal(error.to_string()))?;
-
-    let payment_id = payment.get("id").and_then(Value::as_str).ok_or_else(|| {
-        AppError::Internal("YooKassa response has no payment id".to_string())
-    })?;
-    sqlx::query("UPDATE orders SET payment_id = $1, updated_at = NOW() WHERE id = $2")
-        .bind(payment_id)
+        .await;
+    let payment_id = match &payment {
+        Ok(p) => p.get("id").and_then(Value::as_str).map(str::to_string),
+        Err(error) => {
+            tracing::error!(error = %format!("{error:#}"), order = %order.public_number, "yookassa create_payment failed");
+            None
+        }
+    };
+    let Some(pid) = payment_id else {
+        // No payment was created, so this order can never be paid — don't leave it hanging.
+        sqlx::query("UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1 AND status = 'pending_payment'")
+            .bind(order.id)
+            .execute(&state.pool)
+            .await?;
+        return Err(AppError::Validation(
+            "Онлайн-оплата сейчас недоступна. Оставьте заявку на главной странице или позвоните нам — оформим заказ вручную.".to_string(),
+        ));
+    };
+    let payment = payment.expect("payment id implies a successful response");
+    sqlx::query("UPDATE orders SET payment_id = $1 WHERE id = $2 AND status = 'pending_payment'")
+        .bind(&pid)
         .bind(order.id)
         .execute(&state.pool)
         .await?;
@@ -58,118 +72,229 @@ pub async fn yookassa_webhook(
     State(state): State<AppState>,
     Json(payload): Json<Value>,
 ) -> Result<Json<Value>, AppError> {
-    let payment_id = payload
-        .get("object")
-        .and_then(|v| v.get("id"))
-        .and_then(Value::as_str)
-        .ok_or_else(|| AppError::BadRequest("Некорректное уведомление".into()))?;
-    if !state.config.payments_enabled() {
-        return Err(AppError::Unauthorized);
+    if payload.get("event").and_then(Value::as_str) != Some("payment.succeeded") {
+        return Ok(Json(json!({ "status": "ignored" })));
     }
+    let payment_object = payload
+        .get("object")
+        .ok_or(AppError::BadRequest("Invalid webhook".to_string()))?;
+    let payment_id = payment_object
+        .get("id")
+        .and_then(Value::as_str)
+        .ok_or(AppError::BadRequest("Invalid webhook".to_string()))?;
 
-    // YooKassa does not sign webhook payloads. Never trust it directly: fetch the
-    // payment from the authenticated API and compare its immutable metadata.
-    let verified = YookassaService::new(&state.config)
+    // Webhook data is not trusted. Re-fetch the payment from YooKassa before changing an order.
+    let verified_payment = YookassaService::new(&state.config)
         .get_payment(payment_id)
         .await
-        .map_err(|error| AppError::Internal(error.to_string()))?;
-    if verified.get("status").and_then(Value::as_str) != Some("succeeded") {
-        return Ok(Json(json!({"status":"ignored"})));
-    }
-    let order_id = verified
+        .map_err(|_| AppError::BadRequest("Payment verification failed".to_string()))?;
+    let order_id = verified_payment
         .get("metadata")
-        .and_then(|v| v.get("order_id"))
+        .and_then(|m| m.get("order_id"))
         .and_then(Value::as_str)
-        .and_then(|v| uuid::Uuid::parse_str(v).ok())
-        .ok_or_else(|| AppError::BadRequest("Некорректный идентификатор заказа".into()))?;
+        .ok_or(AppError::BadRequest("Invalid payment metadata".to_string()))?;
+    let order_uuid = order_id
+        .parse::<uuid::Uuid>()
+        .map_err(|_| AppError::BadRequest("Invalid order reference".to_string()))?;
 
-    let mut tx = state.pool.begin().await?;
-    let order = sqlx::query_as::<_, Order>(
-        "SELECT * FROM orders WHERE id = $1 AND payment_id = $2 FOR UPDATE",
-    )
-    .bind(order_id)
-    .bind(payment_id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or(AppError::NotFound)?;
+    let order =
+        sqlx::query_as::<_, Order>("SELECT * FROM orders WHERE id = $1 AND payment_id = $2")
+            .bind(order_uuid)
+            .bind(payment_id)
+            .fetch_optional(&state.pool)
+            .await?
+            .ok_or(AppError::NotFound)?;
+
     if order.status == "paid" {
-        tx.rollback().await?;
-        return Ok(Json(json!({"status":"ok"})));
+        return Ok(Json(json!({ "status": "ok" })));
     }
-    let expected = format!("{:.2}", order.total_amount as f64 / 100.0);
-    let actual = verified
+
+    let amount = verified_payment
         .get("amount")
-        .and_then(|v| v.get("value"))
+        .and_then(|a| a.get("value"))
         .and_then(Value::as_str)
-        .unwrap_or_default();
-    let currency = verified
+        .and_then(|v| v.parse::<f64>().ok())
+        .map(|v| (v * 100.0).round() as i64);
+    let currency = verified_payment
         .get("amount")
-        .and_then(|v| v.get("currency"))
+        .and_then(|a| a.get("currency"))
         .and_then(Value::as_str);
-    if actual != expected || currency != Some("RUB") {
-        return Err(AppError::Unauthorized);
+    if verified_payment.get("status").and_then(Value::as_str) != Some("succeeded")
+        || currency != Some("RUB")
+        || amount != Some(order.total_amount)
+    {
+        return Err(AppError::BadRequest(
+            "Payment verification failed".to_string(),
+        ));
     }
-    let items =
-        sqlx::query_as::<_, OrderItem>("SELECT * FROM order_items WHERE order_id=$1 FOR UPDATE")
-            .bind(order.id)
-            .fetch_all(&mut *tx)
-            .await?;
-    for item in &items {
-        let changed = sqlx::query(
-            "UPDATE products SET stock=stock-$1, updated_at=NOW() WHERE id=$2 AND stock >= $1",
-        )
-        .bind(item.quantity)
-        .bind(item.product_id)
-        .execute(&mut *tx)
-        .await?;
-        if changed.rows_affected() != 1 {
-            return Err(AppError::Validation(
-                "Товар закончился, заказ отменён".into(),
-            ));
-        }
-    }
-    sqlx::query("UPDATE orders SET status='paid', paid_at=NOW(), updated_at=NOW() WHERE id=$1")
+
+    // Stock is written off exactly once, together with the status change: nothing is
+    // reserved while an item sits in a cart or on the payment page, so a buyer can
+    // never block the last unit for themselves (or others) with an abandoned attempt.
+    let mut tx = state.pool.begin().await?;
+    let updated = sqlx::query("UPDATE orders SET status = 'paid', paid_at = NOW(), updated_at = NOW() WHERE id = $1 AND status = 'pending_payment'")
         .bind(order.id)
         .execute(&mut *tx)
         .await?;
+    if updated.rows_affected() == 0 {
+        return Ok(Json(json!({ "status": "ok" })));
+    }
+    let items = sqlx::query_as::<_, OrderItem>("SELECT * FROM order_items WHERE order_id = $1")
+        .bind(order.id)
+        .fetch_all(&mut *tx)
+        .await?;
+    let mut per_product: Vec<(uuid::Uuid, String, i64)> = Vec::new();
+    for item in &items {
+        match per_product.iter_mut().find(|(id, _, _)| *id == item.product_id) {
+            Some(entry) => entry.2 += item.quantity as i64,
+            None => per_product.push((item.product_id, item.product_title.clone(), item.quantity as i64)),
+        }
+    }
+    // Two buyers can pay for the last unit at nearly the same time; the money is
+    // already taken, so the order stays paid and the notification flags the shortage.
+    let mut shortages = Vec::new();
+    for (product_id, title, quantity) in &per_product {
+        let stock: Option<i32> = sqlx::query_scalar("SELECT stock FROM products WHERE id = $1 FOR UPDATE")
+            .bind(product_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+        if let Some(stock) = stock {
+            if (stock as i64) < *quantity {
+                shortages.push(format!("— {title}: на складе было {stock}, оплачено {quantity}"));
+            }
+            sqlx::query("UPDATE products SET stock = GREATEST(stock - $2, 0), updated_at = NOW() WHERE id = $1")
+                .bind(product_id)
+                .bind(quantity)
+                .execute(&mut *tx)
+                .await?;
+        }
+    }
     tx.commit().await?;
+    if !shortages.is_empty() {
+        tracing::warn!(order = %order.public_number, "paid order exceeds stock");
+    }
+    let items_str = items
+        .iter()
+        .map(|item| {
+            format!(
+                "— {} × {} ({:.2} ₽)",
+                item.product_title,
+                item.quantity,
+                item.final_unit_price as f64 / 100.0
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut fields = vec![
+        ("Клиент", order.customer_name.clone()),
+        ("Телефон", order.customer_phone.clone()),
+    ];
+    if let Some(email) = &order.customer_email {
+        fields.push(("Email", email.clone()));
+    }
+    if let Some(address) = &order.customer_address {
+        fields.push(("Адрес", address.clone()));
+    }
+    fields.push(("Сумма", format!("{:.2} ₽", order.total_amount as f64 / 100.0)));
+    fields.push(("Товары", format!("{items_str}\n")));
+    let title = if shortages.is_empty() {
+        format!("🛒 Оплачен заказ {}", order.public_number)
+    } else {
+        fields.push(("⚠️ Не хватает на складе", format!("{}\nСвяжитесь с клиентом: замена, ожидание или возврат.\n", shortages.join("\n"))));
+        format!("⚠️ Оплачен заказ {} — не хватает товара на складе", order.public_number)
+    };
+    Notifier::spawn(
+        &state.config,
+        Notification {
+            title,
+            fields,
+            link: state.config.site_url.as_deref().map(|s| format!("{s}/admin#orders")),
+            reply_to: order.customer_email.clone(),
+        },
+    );
 
-    let mut text = String::new();
-    let mut html = String::new();
-    for item in items {
-        text.push_str(&format!(
-            "- {} x{} ({:.2} ₽)\n",
-            escape_html(&item.product_title),
-            item.quantity,
-            item.final_unit_price as f64 / 100.0
-        ));
-        html.push_str(&format!(
-            "<li>{} x{} — {:.2} ₽</li>",
-            escape_html(&item.product_title),
-            item.quantity,
-            item.final_unit_price as f64 / 100.0
-        ));
-    }
-    if let Err(error) = TelegramService::new(&state.config)
-        .send_order_notification(&order, &text)
-        .await
-    {
-        tracing::error!(?error, "telegram notification failed");
-    }
-    if let Err(error) = EmailService::new(&state.config)
-        .send_order_confirmation(&order, &html)
-        .await
-    {
-        tracing::error!(?error, "email notification failed");
-    }
-    Ok(Json(json!({"status":"ok"})))
+    Ok(Json(json!({ "status": "ok" })))
 }
 
-fn escape_html(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#39;")
+/// Заказ по счёту для юрлиц: онлайн-оплаты нет, счёт выставляется вручную.
+/// Склад не списывается — это произойдёт, когда оплата подтвердится.
+pub async fn create_invoice_order(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(mut req): Json<CreateOrderRequest>,
+) -> Result<Json<Value>, AppError> {
+    if let Ok(user) = crate::handlers::customer_auth::current_customer(&state, &headers).await {
+        req.customer_id = Some(user.id);
+    }
+    let company = req
+        .company_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .ok_or_else(|| AppError::Validation("Укажите название организации".to_string()))?;
+    if !(2..=200).contains(&company.chars().count()) {
+        return Err(AppError::Validation(
+            "Проверьте название организации".to_string(),
+        ));
+    }
+    let inn = req
+        .company_inn
+        .as_deref()
+        .map(str::trim)
+        .unwrap_or_default()
+        .to_string();
+    if !(inn.chars().all(|c| c.is_ascii_digit()) && (inn.len() == 10 || inn.len() == 12)) {
+        return Err(AppError::Validation(
+            "ИНН должен состоять из 10 цифр (организация) или 12 (ИП)".to_string(),
+        ));
+    }
+
+    let order = create_pending_order(&state, &req, "invoice").await?;
+    let items = sqlx::query_as::<_, OrderItem>("SELECT * FROM order_items WHERE order_id = $1")
+        .bind(order.id)
+        .fetch_all(&state.pool)
+        .await?;
+    let items_str = items
+        .iter()
+        .map(|item| {
+            format!(
+                "— {} × {} ({:.2} ₽)",
+                item.product_title,
+                item.quantity,
+                item.final_unit_price as f64 / 100.0
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("
+");
+    let mut fields = vec![
+        ("Организация", company.to_string()),
+        ("ИНН", inn),
+        ("Контактное лицо", order.customer_name.clone()),
+        ("Телефон", order.customer_phone.clone()),
+    ];
+    if let Some(email) = &order.customer_email {
+        fields.push(("Email", email.clone()));
+    }
+    fields.push((
+        "Сумма",
+        format!("{:.2} ₽", order.total_amount as f64 / 100.0),
+    ));
+    fields.push(("Товары", format!("{items_str}
+")));
+    Notifier::spawn(
+        &state.config,
+        Notification {
+            title: format!("🧾 Запрос счёта {} (юрлицо)", order.public_number),
+            fields,
+            link: state
+                .config
+                .site_url
+                .as_deref()
+                .map(|s| format!("{s}/admin#orders")),
+            reply_to: order.customer_email.clone(),
+        },
+    );
+
+    Ok(Json(json!({ "order": order.public_number })))
 }

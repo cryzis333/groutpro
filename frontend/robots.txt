@@ -1,5 +1,11 @@
 User-agent: *
 Allow: /
 Disallow: /admin
+Disallow: /admin/
+Disallow: /admin.html
+Disallow: /admin-login.html
+Disallow: /account
+Disallow: /cart
 Disallow: /api/
+
 Sitemap: https://serious-company.ru/sitemap.xml

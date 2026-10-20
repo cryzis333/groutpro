@@ -52,10 +52,11 @@ impl YookassaService {
             .json(&payload)
             .send()
             .await?
+            .error_for_status()?
             .json::<Value>()
             .await?;
 
-        if !res.get("id").is_some_and(Value::is_string) {
+        if !res.get("id").is_some_and(Value::is_string) || res.get("status").is_none() {
             return Err(anyhow::anyhow!("YooKassa rejected payment creation"));
         }
         Ok(res)
