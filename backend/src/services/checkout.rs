@@ -3,12 +3,25 @@ use uuid::Uuid;
 
 use crate::{
     error::AppError,
-    models::{CreateOrderRequest, Order},
+    models::{CreateOrderRequest, Order, OrderItemRequest},
     state::AppState,
 };
 
 const MAX_ORDER_ITEMS: usize = 30;
 const MAX_QUANTITY_PER_ITEM: i32 = 100;
+
+/// The best discount the buyer is entitled to: discounts open to everyone always
+/// apply, "registered only" ones only when $3 (a verified customer session) is true.
+/// The catalog (handlers::products) shows prices by the same rule.
+const BEST_DISCOUNT_SQL: &str = "SELECT percent_bps,
+        CASE WHEN product_id = $1 THEN 'product' ELSE 'category' END AS source
+     FROM discounts
+     WHERE is_active = TRUE
+       AND (is_registered_only = FALSE OR $3)
+       AND (product_id = $1 OR LOWER(TRIM(category)) = LOWER(TRIM($2)))
+       AND (starts_at IS NULL OR starts_at <= NOW()) AND (ends_at IS NULL OR ends_at > NOW())
+     ORDER BY percent_bps DESC
+     LIMIT 1";
 
 #[derive(FromRow)]
 struct CheckoutProduct {
@@ -31,23 +44,37 @@ pub async fn create_pending_order(
     payment_method: &str,
 ) -> Result<Order, AppError> {
     validate_order_request(req)?;
+    // The same product on two lines must not pass the stock check twice.
+    let lines = merge_order_lines(&req.items);
+    if lines
+        .iter()
+        .any(|(_, quantity)| *quantity > MAX_QUANTITY_PER_ITEM)
+    {
+        return Err(AppError::Validation(
+            "Укажите допустимое количество товара".to_string(),
+        ));
+    }
 
     let mut tx = state.pool.begin().await?;
     let customer_id = req.customer_id;
     let registered_customer = customer_id.is_some();
-    let mut line_items = Vec::with_capacity(req.items.len());
+    let mut line_items = Vec::with_capacity(lines.len());
     let mut total = 0_i64;
 
-    for item in &req.items {
+    for (product_id, quantity) in lines {
         let product = sqlx::query_as::<_, CheckoutProduct>(
             "SELECT id, title, price, stock, category FROM products
              WHERE id = $1 AND archived_at IS NULL AND is_published = TRUE
              FOR UPDATE",
         )
-        .bind(item.product_id)
+        .bind(product_id)
         .fetch_optional(&mut *tx)
         .await?
-        .ok_or(AppError::NotFound)?;
+        .ok_or_else(|| {
+            AppError::Validation(
+                "Товар из корзины больше не продаётся. Обновите корзину.".to_string(),
+            )
+        })?;
 
         if product.price <= 0 {
             // «Цена по запросу»: такую позицию считают по объекту, в заказ она не идёт
@@ -56,41 +83,30 @@ pub async fn create_pending_order(
                 product.title
             )));
         }
-        if product.stock < item.quantity {
+        if product.stock < quantity {
             return Err(AppError::Validation(format!(
                 "Недостаточно товара «{}» на складе",
                 product.title
             )));
         }
 
-        // Registered-user pricing is enabled only after checkout receives a verified session.
-        let discount = if registered_customer {
-            sqlx::query_as::<_, DiscountRow>(
-                "SELECT percent_bps, CASE WHEN product_id = $1 THEN 'product' ELSE 'category' END AS source
-                 FROM discounts WHERE is_active = TRUE AND is_registered_only = TRUE
-                 AND (product_id = $1 OR LOWER(TRIM(category)) = LOWER(TRIM($2)))
-                 AND (starts_at IS NULL OR starts_at <= NOW()) AND (ends_at IS NULL OR ends_at > NOW())
-                 ORDER BY percent_bps DESC LIMIT 1"
-            )
+        // Registered-only discounts need a verified session (customer_id is set by
+        // the handler from the session cookie, never from the request body).
+        let discount = sqlx::query_as::<_, DiscountRow>(BEST_DISCOUNT_SQL)
             .bind(product.id)
             .bind(product.category.as_deref())
+            .bind(registered_customer)
             .fetch_optional(&mut *tx)
-            .await?
-        } else {
-            None
-        };
-        let final_price = discount
-            .as_ref()
-            .map(|d| product.price * (10_000 - d.percent_bps) as i64 / 10_000)
-            .unwrap_or(product.price);
+            .await?;
+        let final_price = final_price_for(product.price, discount.as_ref());
         let line_total = final_price
-            .checked_mul(item.quantity as i64)
+            .checked_mul(i64::from(quantity))
             .ok_or_else(|| AppError::Validation("Сумма заказа слишком велика".to_string()))?;
         total = total
             .checked_add(line_total)
             .ok_or_else(|| AppError::Validation("Сумма заказа слишком велика".to_string()))?;
 
-        line_items.push((product, item.quantity, discount));
+        line_items.push((product, quantity, discount));
     }
 
     let public_number = format!(
@@ -130,10 +146,28 @@ pub async fn create_pending_order(
     Ok(order)
 }
 
+/// Unit price after a discount given in basis points (1250 = 12.5 %), rounded
+/// down to whole kopecks — the same formula the frontend uses for display.
 fn final_price_for(price: i64, discount: Option<&DiscountRow>) -> i64 {
     discount
-        .map(|d| price * (10_000 - d.percent_bps) as i64 / 10_000)
+        .map(|d| price * i64::from(10_000 - d.percent_bps) / 10_000)
         .unwrap_or(price)
+}
+
+/// Sums the quantities of repeated products, keeping the order in which they
+/// first appear in the cart.
+fn merge_order_lines(items: &[OrderItemRequest]) -> Vec<(Uuid, i32)> {
+    let mut lines: Vec<(Uuid, i32)> = Vec::with_capacity(items.len());
+    for item in items {
+        match lines
+            .iter_mut()
+            .find(|(product_id, _)| *product_id == item.product_id)
+        {
+            Some((_, quantity)) => *quantity = quantity.saturating_add(item.quantity),
+            None => lines.push((item.product_id, item.quantity)),
+        }
+    }
+    lines
 }
 
 async fn insert_order(
@@ -237,4 +271,65 @@ fn validate_order_request(req: &CreateOrderRequest) -> Result<(), AppError> {
         return Err(AppError::Validation("Адрес слишком длинный".to_string()));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{final_price_for, merge_order_lines, DiscountRow};
+    use crate::models::OrderItemRequest;
+    use uuid::Uuid;
+
+    fn discount(percent_bps: i32) -> DiscountRow {
+        DiscountRow {
+            percent_bps,
+            source: "category".to_string(),
+        }
+    }
+
+    fn item(id: u128, quantity: i32) -> OrderItemRequest {
+        OrderItemRequest {
+            product_id: Uuid::from_u128(id),
+            quantity,
+        }
+    }
+
+    #[test]
+    fn applies_discount_in_basis_points() {
+        assert_eq!(final_price_for(10_000, None), 10_000);
+        assert_eq!(final_price_for(10_000, Some(&discount(1_000))), 9_000);
+        assert_eq!(
+            final_price_for(1_890_000, Some(&discount(1_250))),
+            1_653_750
+        );
+        assert_eq!(final_price_for(10_000, Some(&discount(9_999))), 1);
+    }
+
+    #[test]
+    fn rounds_fractional_kopecks_down() {
+        assert_eq!(final_price_for(999, Some(&discount(3_333))), 666);
+        assert_eq!(final_price_for(1, Some(&discount(5_000))), 0);
+    }
+
+    #[test]
+    fn merges_repeated_products() {
+        let lines = merge_order_lines(&[item(1, 2), item(2, 1), item(1, 3), item(3, 4)]);
+        assert_eq!(
+            lines,
+            vec![
+                (Uuid::from_u128(1), 5),
+                (Uuid::from_u128(2), 1),
+                (Uuid::from_u128(3), 4)
+            ]
+        );
+    }
+
+    #[test]
+    fn keeps_unique_lines_untouched() {
+        let lines = merge_order_lines(&[item(7, 1), item(8, 100)]);
+        assert_eq!(
+            lines,
+            vec![(Uuid::from_u128(7), 1), (Uuid::from_u128(8), 100)]
+        );
+        assert!(merge_order_lines(&[]).is_empty());
+    }
 }
