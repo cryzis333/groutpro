@@ -11,26 +11,6 @@
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://serious-company.ru/#services</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://serious-company.ru/#pricing</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://serious-company.ru/#gallery</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://serious-company.ru/#contact</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
     <loc>https://serious-company.ru/privacy-policy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
