@@ -57,33 +57,49 @@
   const iconSun = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>';
   const iconMoon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
 
-  function setTheme(theme) {
-    html.setAttribute('data-theme', theme);
-    localStorage.setItem('groutpro-theme', theme);
-    themeToggle.innerHTML = theme === 'dark' ? iconSun : iconMoon;
+  // localStorage can be unavailable (private mode, blocked site data): theme must still work
+  function readStoredTheme() {
+    try { return localStorage.getItem('groutpro-theme'); } catch (e) { return null; }
   }
 
-  const savedTheme = localStorage.getItem('groutpro-theme');
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  setTheme(savedTheme || (prefersDark ? 'dark' : 'light'));
+  function setTheme(theme, persist) {
+    html.setAttribute('data-theme', theme);
+    if (persist) {
+      try { localStorage.setItem('groutpro-theme', theme); } catch (e) {}
+    }
+    if (themeToggle) themeToggle.innerHTML = theme === 'dark' ? iconSun : iconMoon;
+  }
 
-  themeToggle.addEventListener('click', () => {
-    const current = html.getAttribute('data-theme');
-    setTheme(current === 'dark' ? 'light' : 'dark');
-  });
+  const darkSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  setTheme(readStoredTheme() || (darkSchemeQuery.matches ? 'dark' : 'light'), false);
+
+  // Until the visitor picks a theme explicitly, follow the OS setting
+  const onSchemeChange = (e) => { if (!readStoredTheme()) setTheme(e.matches ? 'dark' : 'light', false); };
+  if (darkSchemeQuery.addEventListener) darkSchemeQuery.addEventListener('change', onSchemeChange);
+
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      const current = html.getAttribute('data-theme');
+      setTheme(current === 'dark' ? 'light' : 'dark', true);
+    });
+  }
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  // Scroll lock shared by the mobile menu and the lightbox
+  const scrollLocks = new Set();
+  function lockScroll(reason, on) {
+    if (on) scrollLocks.add(reason); else scrollLocks.delete(reason);
+    html.classList.toggle('is-scroll-locked', scrollLocks.size > 0);
+  }
 
   // Navbar scroll effect
   const nav = document.querySelector('.nav');
-  let lastScroll = 0;
-  window.addEventListener('scroll', () => {
-    const currentScroll = window.pageYOffset;
-    if (currentScroll > 50) {
-      nav.classList.add('scrolled');
-    } else {
-      nav.classList.remove('scrolled');
-    }
-    lastScroll = currentScroll;
-  }, { passive: true });
+  if (nav) {
+    const syncNav = () => nav.classList.toggle('scrolled', window.pageYOffset > 50);
+    window.addEventListener('scroll', syncNav, { passive: true });
+    syncNav();
+  }
 
   // Reveal on scroll
   const revealElements = document.querySelectorAll('.reveal');
@@ -105,35 +121,35 @@
     revealElements.forEach(el => el.classList.add('active'));
   }
 
-  // Mobile menu
+  // Mobile menu: #menuBtn is a <button aria-controls="mobileMenu">; the closed menu is
+  // visibility:hidden + inert, so its links are neither visible nor focusable.
   const menuBtn = document.getElementById('menuBtn');
   const mobileMenu = document.getElementById('mobileMenu');
 
   if (menuBtn && mobileMenu) {
-    const mobileLinks = mobileMenu.querySelectorAll('a');
+    const isMenuOpen = () => mobileMenu.classList.contains('active');
 
-    function toggleMenu(show) {
-      mobileMenu.classList.toggle('active', show);
-      menuBtn.classList.toggle('active', show);
-      menuBtn.setAttribute('aria-expanded', String(show));
-      document.body.style.overflow = show ? 'hidden' : '';
-    }
+    const setMenu = (open, restoreFocus) => {
+      mobileMenu.classList.toggle('active', open);
+      mobileMenu.toggleAttribute('inert', !open);
+      menuBtn.classList.toggle('active', open);
+      menuBtn.setAttribute('aria-expanded', String(open));
+      menuBtn.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню');
+      html.classList.toggle('is-menu-open', open);
+      lockScroll('menu', open);
+      if (!open && restoreFocus) menuBtn.focus();
+    };
 
-    if (!menuBtn.hasAttribute('aria-label')) menuBtn.setAttribute('aria-label', 'Открыть меню');
-    menuBtn.setAttribute('role', 'button');
-    menuBtn.setAttribute('tabindex', '0');
-
-    menuBtn.addEventListener('click', () => toggleMenu(!mobileMenu.classList.contains('active')));
-    menuBtn.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        toggleMenu(!mobileMenu.classList.contains('active'));
-      }
-    });
-    mobileLinks.forEach(link => link.addEventListener('click', () => toggleMenu(false)));
+    menuBtn.addEventListener('click', () => setMenu(!isMenuOpen(), false));
+    // Any link (incl. the call button) closes the menu before the browser follows it
+    mobileMenu.addEventListener('click', (e) => { if (e.target.closest('a')) setMenu(false, false); });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && mobileMenu.classList.contains('active')) toggleMenu(false);
+      if (e.key === 'Escape' && isMenuOpen()) setMenu(false, true);
     });
+    // Widening past the burger breakpoint must not leave the page locked behind a hidden menu
+    const desktopNav = window.matchMedia('(min-width: 1101px)');
+    const onDesktopNav = (e) => { if (e.matches && isMenuOpen()) setMenu(false, false); };
+    if (desktopNav.addEventListener) desktopNav.addEventListener('change', onDesktopNav);
   }
 
   // Stats counter animation
@@ -163,29 +179,86 @@
 
   statNumbers.forEach(el => statsObserver.observe(el));
 
-  // Smooth scroll for anchor links
-  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function(e) {
-      const href = this.getAttribute('href');
-      if (!href || href === '#') return;
+  // In-page links (#contact, or /#contact while already on the home page): smooth scroll that
+  // honours scroll-margin-top and prefers-reduced-motion and keeps the hash in the address bar.
+  const findHashTarget = (hash) => {
+    if (!hash || hash.length < 2) return null;
+    try { return document.getElementById(decodeURIComponent(hash.slice(1))); } catch (e) { return null; }
+  };
+
+  document.addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const link = e.target.closest('a[href]');
+    if (!link || (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
+    const href = link.getAttribute('href');
+    if (/^(tel|mailto):/i.test(href)) return;
+    const url = new URL(link.href, location.href);
+    if (url.origin !== location.origin || url.pathname !== location.pathname || url.search !== location.search) return;
+    const behavior = reduceMotion.matches ? 'auto' : 'smooth';
+    if (!url.hash) {
+      if (href.charAt(0) === '#') return;
+      // e.g. «Главная» on the home page: back to the top instead of reloading
       e.preventDefault();
-      const target = document.querySelector(href);
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    });
+      window.scrollTo({ top: 0, behavior });
+      if (location.hash) history.pushState(null, '', url.pathname + url.search);
+      return;
+    }
+    const target = findHashTarget(url.hash);
+    if (!target) return;
+    e.preventDefault();
+    target.scrollIntoView({ behavior, block: 'start' });
+    if (location.hash !== url.hash) history.pushState(null, '', url.hash);
   });
 
-  // Parallax effect for hero
+  // Arriving from another page at /#contact etc.: the price list and the reviews are rendered
+  // above the target after the browser has already jumped to it, pushing it down. Re-align once
+  // when they (and the web font) are in, unless the visitor has started scrolling meanwhile.
+  const landingTarget = findHashTarget(location.hash);
+  if (landingTarget) {
+    const blocksAbove = ['estimate-items', 'reviews-list']
+      .map(id => document.getElementById(id))
+      .filter(el => el && (el.compareDocumentPosition(landingTarget) & Node.DOCUMENT_POSITION_FOLLOWING));
+    if (blocksAbove.length) {
+      let userScrolled = false;
+      const interactions = ['wheel', 'touchstart', 'keydown', 'mousedown'];
+      const onInteract = () => { userScrolled = true; };
+      interactions.forEach(type => window.addEventListener(type, onInteract, { passive: true }));
+      const firstRender = el => new Promise(resolve => {
+        const observer = new MutationObserver(() => { observer.disconnect(); resolve(); });
+        observer.observe(el, { childList: true });
+        setTimeout(() => { observer.disconnect(); resolve(); }, 6000);
+      });
+      const waits = blocksAbove.map(firstRender);
+      if (document.fonts && document.fonts.ready) waits.push(document.fonts.ready.catch(() => {}));
+      Promise.all(waits).then(() => {
+        interactions.forEach(type => window.removeEventListener(type, onInteract));
+        if (userScrolled) return;
+        requestAnimationFrame(() => {
+          const previous = html.style.scrollBehavior;
+          html.style.scrollBehavior = 'auto';
+          landingTarget.scrollIntoView({ block: 'start' });
+          html.style.scrollBehavior = previous;
+        });
+      });
+    }
+  }
+
+  // Hero parallax: desktop with a precise pointer only (costly on phones), never with reduced motion
   const heroBg = document.querySelector('.hero-bg');
-  if (heroBg && !window.matchMedia('(pointer: coarse)').matches) {
+  if (heroBg) {
+    const parallaxQuery = window.matchMedia('(min-width: 901px) and (hover: hover) and (pointer: fine)');
+    let parallaxQueued = false;
+    const applyParallax = () => {
+      parallaxQueued = false;
+      const y = window.pageYOffset;
+      const on = parallaxQuery.matches && !reduceMotion.matches && y < window.innerHeight * 1.5;
+      heroBg.style.transform = on ? `translateY(${y * 0.3}px)` : '';
+    };
     window.addEventListener('scroll', () => {
-      const scrolled = window.pageYOffset;
-      heroBg.style.transform = `translateY(${scrolled * 0.3}px)`;
+      if (!parallaxQueued) { parallaxQueued = true; requestAnimationFrame(applyParallax); }
     }, { passive: true });
   }
 
-  // TODO: Replace these values with the confirmed business address, coordinates, and Yandex Maps URL before publishing.
   const CONTACT_LOCATION = {
     phone: '+7 905 405-31-33',
     phoneHref: '+79054053133',
@@ -225,18 +298,11 @@
     });
   }
 
-  // Gallery lightbox
-  const GALLERY_PHOTOS = [
-    { src: 'images/gallery-samples.webp', caption: 'Образцы материалов для инъектирования' },
-    { src: 'images/gallery-warehouse.webp', caption: 'Склад оборудования и материалов' },
-    { src: 'images/gallery-ceiling-work.webp', caption: 'Инъектирование трещины в перекрытии' },
-    { src: 'images/gallery-soil-diagram.webp', caption: 'Схема инъектирования и стабилизации грунта' },
-    { src: 'images/gallery-soil-binding.webp', caption: 'Показательный опыт: полимерный состав связывает песок в монолит' },
-    { src: 'images/gallery-conference.webp', caption: 'Отраслевая конференция РосПро 2026' }
-  ];
-
+  // Gallery lightbox. Photos and captions come from the gallery markup itself, so the order
+  // and texts can never drift apart. Items are keyboard-operable buttons; focus is kept inside
+  // the dialog while it is open and returns to the photo that opened it.
   const lightbox = document.getElementById('lightbox');
-  const galleryItems = document.querySelectorAll('.gallery-item');
+  const galleryItems = [...document.querySelectorAll('.gallery-item')].filter(item => item.querySelector('img'));
   if (lightbox && galleryItems.length) {
     const lbImage = document.getElementById('lightbox-image');
     const lbCaption = document.getElementById('lightbox-caption');
@@ -244,10 +310,17 @@
     const lbClose = document.getElementById('lightbox-close');
     const lbPrev = document.getElementById('lightbox-prev');
     const lbNext = document.getElementById('lightbox-next');
+    const photos = galleryItems.map(item => {
+      const img = item.querySelector('img');
+      return { src: img.getAttribute('src'), caption: img.getAttribute('alt') || '' };
+    });
     let currentIndex = 0;
+    let returnFocus = null;
+    let hideTimer = null;
+    const isLightboxOpen = () => lightbox.classList.contains('is-open');
 
     function renderSlide() {
-      const photo = GALLERY_PHOTOS[currentIndex];
+      const photo = photos[currentIndex];
       lbImage.style.opacity = '0';
       setTimeout(() => {
         lbImage.src = photo.src;
@@ -255,42 +328,76 @@
         lbImage.style.opacity = '1';
       }, 120);
       lbCaption.textContent = photo.caption;
-      lbCounter.textContent = `${currentIndex + 1} / ${GALLERY_PHOTOS.length}`;
+      lbCounter.textContent = `${currentIndex + 1} / ${photos.length}`;
     }
 
     function openLightbox(index) {
       currentIndex = index;
+      returnFocus = document.activeElement;
+      clearTimeout(hideTimer);
       lightbox.hidden = false;
-      document.body.style.overflow = 'hidden';
-      setTimeout(() => lightbox.classList.add('is-open'), 10);
+      lockScroll('lightbox', true);
+      requestAnimationFrame(() => lightbox.classList.add('is-open'));
       renderSlide();
+      lbClose.focus({ preventScroll: true });
     }
 
     function closeLightbox() {
+      if (lightbox.hidden) return;
       lightbox.classList.remove('is-open');
-      document.body.style.overflow = '';
-      setTimeout(() => { lightbox.hidden = true; }, 250);
+      lockScroll('lightbox', false);
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => { lightbox.hidden = true; }, 250);
+      if (returnFocus && typeof returnFocus.focus === 'function') returnFocus.focus({ preventScroll: true });
+      returnFocus = null;
     }
 
     function step(delta) {
-      currentIndex = (currentIndex + delta + GALLERY_PHOTOS.length) % GALLERY_PHOTOS.length;
+      currentIndex = (currentIndex + delta + photos.length) % photos.length;
       renderSlide();
     }
 
     galleryItems.forEach((item, index) => {
-      item.style.cursor = 'pointer';
+      item.setAttribute('role', 'button');
+      item.setAttribute('tabindex', '0');
+      item.setAttribute('aria-label', `Открыть фото: ${photos[index].caption}`);
       item.addEventListener('click', () => openLightbox(index));
+      item.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openLightbox(index);
+        }
+      });
     });
 
     lbClose.addEventListener('click', closeLightbox);
     lbPrev.addEventListener('click', () => step(-1));
     lbNext.addEventListener('click', () => step(1));
     lightbox.addEventListener('click', (e) => { if (e.target === lightbox) closeLightbox(); });
+
+    // Swipe left/right on touch screens
+    let touchStartX = null;
+    lightbox.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches.length === 1 ? e.touches[0].clientX : null;
+    }, { passive: true });
+    lightbox.addEventListener('touchend', (e) => {
+      if (touchStartX === null) return;
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      touchStartX = null;
+      if (Math.abs(dx) > 50) step(dx < 0 ? 1 : -1);
+    });
+
     document.addEventListener('keydown', (e) => {
-      if (lightbox.hidden) return;
-      if (e.key === 'Escape') closeLightbox();
-      if (e.key === 'ArrowLeft') step(-1);
-      if (e.key === 'ArrowRight') step(1);
+      if (lightbox.hidden || !isLightboxOpen()) return;
+      if (e.key === 'Escape') { e.preventDefault(); closeLightbox(); }
+      else if (e.key === 'ArrowLeft') step(-1);
+      else if (e.key === 'ArrowRight') step(1);
+      else if (e.key === 'Tab') {
+        const focusable = [lbClose, lbPrev, lbNext];
+        const i = focusable.indexOf(document.activeElement);
+        e.preventDefault();
+        focusable[e.shiftKey ? (i <= 0 ? focusable.length - 1 : i - 1) : (i + 1) % focusable.length].focus();
+      }
     });
   }
 
@@ -345,24 +452,6 @@
         btn.textContent = originalText;
       }
     });
-  }
-
-
-
-  // --- Реальное число выполненных объектов (заявки + оплаченные заказы + база)
-  const objectsStat = document.querySelector('[data-stat="objects"]');
-  if (objectsStat) {
-    fetch('/api/stats')
-      .then(r => (r.ok ? r.json() : null))
-      .then(stats => {
-        if (stats && Number.isFinite(stats.objects)) {
-          objectsStat.dataset.count = stats.objects;
-          if (objectsStat.textContent.trim() && !objectsStat.textContent.startsWith('0')) {
-            objectsStat.textContent = stats.objects + (objectsStat.dataset.suffix || '');
-          }
-        }
-      })
-      .catch(() => {});
   }
 
   const rub = value => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(value / 100);
@@ -512,7 +601,11 @@
 
     let rating = 5;
     const ratingBox = document.getElementById('review-rating');
-    const paintStars = () => ratingBox.querySelectorAll('.review-star').forEach(b => b.classList.toggle('is-on', Number(b.dataset.value) <= rating));
+    const paintStars = () => ratingBox.querySelectorAll('.review-star').forEach(b => {
+      const value = Number(b.dataset.value);
+      b.classList.toggle('is-on', value <= rating);
+      b.setAttribute('aria-pressed', String(value === rating));
+    });
     ratingBox.addEventListener('click', event => {
       const star = event.target.closest('.review-star');
       if (!star) return;
@@ -521,12 +614,14 @@
     });
     paintStars();
 
+    // The rating only applies to reviews; form.reset() fires no change event, so resync after it too
     const ratingGroup = document.getElementById('review-rating-group');
-    document.querySelectorAll('input[name="review-kind"]').forEach(input => {
-      input.addEventListener('change', () => {
-        ratingGroup.hidden = document.querySelector('input[name="review-kind"]:checked').value === 'suggestion';
-      });
-    });
+    const syncRatingGroup = () => {
+      const kind = document.querySelector('input[name="review-kind"]:checked');
+      ratingGroup.hidden = !!kind && kind.value === 'suggestion';
+    };
+    document.querySelectorAll('input[name="review-kind"]').forEach(input => input.addEventListener('change', syncRatingGroup));
+    syncRatingGroup();
 
     const status = document.getElementById('review-status');
     document.getElementById('review-form').addEventListener('submit', async event => {
@@ -555,6 +650,7 @@
         event.target.reset();
         rating = 5;
         paintStars();
+        syncRatingGroup();
         status.textContent = kind === 'suggestion'
           ? 'Спасибо! Передали предложение — посмотрим и ответим, если оставили контакт.'
           : 'Спасибо! Отзыв появится на сайте после проверки.';
