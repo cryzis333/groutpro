@@ -15,17 +15,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!res.ok) throw new Error('Not found');
         const p = await res.json();
 
-        if (p.category) {
-            try {
-                fetch('/api/analytics/view', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path: location.pathname, category: p.category }),
-                    keepalive: true
-                }).catch(() => {});
-            } catch (e) {}
-        }
-
         document.getElementById('prod-title').textContent = p.title;
         // Tab title, description and search-engine data per product
         document.title = `${p.title} — ГраутПро`;

@@ -41,15 +41,31 @@
   }
 
 
-  // Site visit tracking
-  try {
-    fetch('/api/analytics/view', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: location.pathname }),
-      keepalive: true
-    }).catch(() => {});
-  } catch (e) {}
+  // Учёт посещений: один просмотр на загрузку страницы, без ожидания ответа и без ошибок.
+  // Страница товара отправляет просмотр с категорией товара (product.js свой больше не шлёт).
+  const sendView = category => {
+    try {
+      fetch('/api/analytics/view', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(category ? { path: location.pathname, category } : { path: location.pathname }),
+        keepalive: true
+      }).catch(() => {});
+    } catch (e) {}
+  };
+  if (document.getElementById('prod-title')) {
+    const productId = new URLSearchParams(location.search).get('id')
+      || (location.pathname.match(/^\/product\/([0-9a-fA-F-]{36})\/?$/) || [])[1];
+    // Без id product.js сразу уводит в каталог — там просмотр и засчитается
+    if (productId) {
+      fetch('/api/products/' + encodeURIComponent(productId))
+        .then(r => (r.ok ? r.json() : null))
+        .catch(() => null)
+        .then(p => sendView(p && p.category));
+    }
+  } else {
+    sendView(null);
+  }
 
   // Theme toggle
   const themeToggle = document.getElementById('themeToggle');
@@ -569,4 +585,66 @@
     });
   }
 
+})();
+
+// ============================================================================
+// Аналитика направлений на главной.
+// Самостоятельный блок: не зависит от кода выше и ничего не ломает при ошибке.
+// ============================================================================
+
+// --- Какие направления смотрят: «Инъектирование бетона», «Гидроизоляция»,
+// «Стабилизация грунта». Заголовок карточки в index.html помечен data-topic.
+// Когда карточка видна хотя бы наполовину не меньше секунды, отправляем
+// просмотр с этой категорией — по одному разу на направление за загрузку.
+// Путь вида «/#services» (раздел, где увидели) отличает такие события от
+// просмотров страниц: у настоящих страниц в пути нет «#».
+(function () {
+  'use strict';
+  const markers = document.querySelectorAll('[data-topic]');
+  if (!markers.length || !('IntersectionObserver' in window)) return;
+
+  const MIN_VISIBLE_MS = 1000;
+  const topicOf = new Map();   // карточка → направление
+  const timers = new Map();    // карточка → таймер «видна достаточно долго»
+  const sent = new Set();      // направления, уже отправленные с этой загрузки
+
+  const report = (topic, card) => {
+    const section = card.closest('section[id]');
+    try {
+      fetch('/api/analytics/view', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: location.pathname + '#' + (section ? section.id : 'topic'), category: topic }),
+        keepalive: true
+      }).catch(() => {});
+    } catch (e) {}
+  };
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      const card = entry.target;
+      const topic = topicOf.get(card);
+      if (!entry.isIntersecting) {
+        clearTimeout(timers.get(card));
+        timers.delete(card);
+        return;
+      }
+      if (sent.has(topic) || timers.has(card)) return;
+      timers.set(card, setTimeout(() => {
+        timers.delete(card);
+        if (sent.has(topic)) return;
+        sent.add(topic);
+        report(topic, card);
+        topicOf.forEach((t, el) => { if (t === topic) observer.unobserve(el); });
+      }, MIN_VISIBLE_MS));
+    });
+  }, { threshold: 0.5 });
+
+  markers.forEach(marker => {
+    const topic = marker.dataset.topic.trim();
+    const card = marker.closest('.card') || marker;
+    if (!topic || topicOf.has(card)) return;
+    topicOf.set(card, topic);
+    observer.observe(card);
+  });
 })();
