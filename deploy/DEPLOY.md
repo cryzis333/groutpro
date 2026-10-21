@@ -292,7 +292,9 @@ curl -s --resolve "$D:443:127.0.0.1" "https://$D/api/products?page_size=1" | gre
 - [ ] главная и мобильное меню, магазин (порядок позиций), карточка товара, корзина (до оплаты), `/account`;
 - [ ] `/admin/login` → вход → «Товары» (видны и скрытые позиции, есть порядок), «Заказы», «Заявки»,
       «Аналитика» открывается без ошибки;
-- [ ] тестовая заявка с главной дошла в Telegram / MAX / почту. Если нет:
+- [ ] тестовая заявка с главной дошла в Telegram / MAX / почту. Каналы можно проверить и без заявки:
+      `cd "$APP" && sudo ./backend/target/release/groutpro-backend notify-test` (по строке на канал:
+      «отправлено», «не настроен» или «ОШИБКА — …»). Журнал:
       `sudo journalctl -u "$SERVICE" -n 30 --no-pager | grep -i -E 'telegram|max|smtp|mail'`.
 
 Повторная диагностика: `sudo bash "$APP/deploy/server-check.sh" > ~/server-check-after.txt 2>&1`.
