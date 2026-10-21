@@ -382,7 +382,7 @@
         const sum = item.price;
         row.classList.toggle('is-on', on);
         const sumEl = row.querySelector('.estimate-item-sum');
-        if (sumEl) sumEl.textContent = on ? rub(sum) : '';
+        if (sumEl) sumEl.textContent = on ? (sum > 0 ? rub(sum) : 'по запросу') : '';
         if (on) total += sum;
       });
       document.getElementById('estimate-works').textContent = rub(total);
@@ -392,7 +392,8 @@
     fetch('/api/products?page_size=50')
       .then(r => r.json())
       .then(products => {
-        priceList = (products || []).filter(p => p.price > 0);
+        // Цена 0 — «по запросу»: позицию показываем, но в сумму она не входит
+        priceList = (products || []).filter(p => p.price >= 0);
         if (!priceList.length) {
           estimateBox.innerHTML = '<p style="color:var(--muted)">Прайс появится, когда в магазине будут позиции.</p>';
           return;
@@ -401,7 +402,7 @@
           '<label class="estimate-item" id="estimate-row-' + i + '">' +
             '<input type="checkbox" aria-label="Включить в смету: ' + escapeText(p.title) + '">' +
             '<span class="estimate-item-title">' + escapeText(p.title) +
-              '<small>' + escapeText(p.category || 'услуга') + ' &middot; ' + (p.unit && p.unit !== 'шт' ? 'от ' : '') + rub(p.price) + (p.unit ? ' / ' + escapeText(p.unit) : '') + '</small>' +
+              '<small>' + escapeText(p.category || 'услуга') + ' &middot; ' + (p.price > 0 ? (p.unit && p.unit !== 'шт' ? 'от ' : '') + rub(p.price) + (p.unit ? ' / ' + escapeText(p.unit) : '') : 'цена по запросу') + '</small>' +
             '</span>' +
             '<span class="estimate-item-sum"></span>' +
           '</label>'
