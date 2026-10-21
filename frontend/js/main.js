@@ -588,8 +588,8 @@
 })();
 
 // ============================================================================
-// Аналитика направлений на главной.
-// Самостоятельный блок: не зависит от кода выше и ничего не ломает при ошибке.
+// Аналитика направлений на главной + цвет панели браузера.
+// Самостоятельные блоки: не используют код выше, сетевые ошибки глушатся.
 // ============================================================================
 
 // --- Какие направления смотрят: «Инъектирование бетона», «Гидроизоляция»,
@@ -647,4 +647,19 @@
     topicOf.set(card, topic);
     observer.observe(card);
   });
+})();
+
+// --- <meta name="theme-color"> следует за темой сайта (переключатель в шапке),
+// а не только за системной: цвет берём из --bg текущей темы.
+(function () {
+  'use strict';
+  const metas = document.querySelectorAll('meta[name="theme-color"]');
+  if (!metas.length) return;
+  const root = document.documentElement;
+  const apply = () => {
+    const color = getComputedStyle(root).getPropertyValue('--bg').trim();
+    if (color) metas.forEach(meta => meta.setAttribute('content', color));
+  };
+  apply();
+  new MutationObserver(apply).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
 })();
