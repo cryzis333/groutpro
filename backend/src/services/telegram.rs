@@ -5,8 +5,9 @@ use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
 
-/// Telegram rejects messages longer than 4096 characters (counted in UTF-16, so an
-/// emoji takes two); keep a margin.
+/// Telegram rejects messages longer than 4096 characters, and it counts them in
+/// UTF-16 code units (an emoji takes two). Every length below is counted the same
+/// way; keep a margin.
 const MESSAGE_LIMIT: usize = 4000;
 const TITLE_LIMIT: usize = 256;
 const LINK_LIMIT: usize = 512;
@@ -86,9 +87,9 @@ fn render(notification: &Notification) -> String {
     render_within(notification, MESSAGE_LIMIT)
 }
 
-/// Builds the HTML message so that it never exceeds `limit` characters. Long values
-/// are shortened as raw text *before* escaping, so a cut can never split a tag or
-/// an entity like `&amp;` — Telegram would reject the whole message.
+/// Builds the HTML message so that it never exceeds `limit` UTF-16 code units. Long
+/// values are shortened as raw text *before* escaping, so a cut can never split a
+/// tag or an entity like `&amp;` — Telegram would reject the whole message.
 fn render_within(notification: &Notification, limit: usize) -> String {
     let mut title_budget = TITLE_LIMIT;
     let title = escape_within(&notification.title, &mut title_budget);
@@ -100,13 +101,13 @@ fn render_within(notification: &Notification, limit: usize) -> String {
     // Fixed markup: "<b></b>\n" around the title, at most "\n<b>label:</b>\n" and a
     // trailing "\n" per field, "\n\n" before the link.
     let markup = 8
-        + title.chars().count()
+        + utf16_len(&title)
         + notification
             .fields
             .iter()
-            .map(|(label, _)| label.chars().count() + 11)
+            .map(|(label, _)| utf16_len(label) + 11)
             .sum::<usize>()
-        + link.as_ref().map_or(0, |link| link.chars().count() + 2);
+        + link.as_ref().map_or(0, |link| utf16_len(link) + 2);
     // What is left is shared by the field values in order: a long value only
     // shortens itself and whatever comes after it.
     let mut budget = limit.saturating_sub(markup);
@@ -127,9 +128,9 @@ fn render_within(notification: &Notification, limit: usize) -> String {
     text
 }
 
-/// Escapes `value` into at most `budget` characters and takes them off the budget.
-/// A value that doesn't fit is cut as raw text at a character boundary, gets "…",
-/// and only then is escaped.
+/// Escapes `value` into at most `budget` UTF-16 code units and takes them off the
+/// budget. A value that doesn't fit is cut as raw text at a character boundary,
+/// gets "…", and only then is escaped.
 fn escape_within(value: &str, budget: &mut usize) -> String {
     let full: usize = value.chars().map(escaped_len).sum();
     if full <= *budget {
@@ -154,14 +155,19 @@ fn escape_within(value: &str, budget: &mut usize) -> String {
     format!("{}…", escape_html(&value[..end]))
 }
 
-/// Length of `ch` after `escape_html`.
+/// Length of `ch` after `escape_html`, in UTF-16 code units.
 fn escaped_len(ch: char) -> usize {
     match ch {
         '&' => 5,       // &amp;
         '<' | '>' => 4, // &lt; &gt;
         '"' => 6,       // &quot;
-        _ => 1,
+        _ => ch.len_utf16(),
     }
+}
+
+/// Message length the way Telegram counts it.
+fn utf16_len(text: &str) -> usize {
+    text.encode_utf16().count()
 }
 
 fn build_client(proxy: &str) -> anyhow::Result<Client> {
@@ -180,7 +186,7 @@ fn build_client(proxy: &str) -> anyhow::Result<Client> {
 
 #[cfg(test)]
 mod tests {
-    use super::{escape_within, escaped_len, render, render_within, MESSAGE_LIMIT};
+    use super::{escape_within, escaped_len, render, render_within, utf16_len, MESSAGE_LIMIT};
     use crate::services::notify::{escape_html, Notification};
 
     fn notification(fields: Vec<(&'static str, String)>) -> Notification {
@@ -210,7 +216,7 @@ mod tests {
     fn escaped_len_matches_escape_html() {
         for ch in ['&', '<', '>', '"', 'a', 'ж', '€', '🛒'] {
             let escaped = escape_html(ch.encode_utf8(&mut [0; 4]));
-            assert_eq!(escaped_len(ch), escaped.chars().count(), "{ch}");
+            assert_eq!(escaped_len(ch), utf16_len(&escaped), "{ch}");
         }
     }
 
@@ -243,18 +249,30 @@ mod tests {
             ("Ориентировочно", "12 345.00 ₽".to_string()),
         ];
         let text = render(&notification(fields));
-        assert!(text.chars().count() <= MESSAGE_LIMIT);
+        assert!(utf16_len(&text) <= MESSAGE_LIMIT);
         assert_well_formed(&text);
         assert!(text.contains('…'));
         assert!(text.ends_with("https://example.ru/admin#leads"));
     }
 
     #[test]
+    fn emoji_count_twice_like_in_telegram() {
+        let text = render(&notification(vec![("Задача", "🛒".repeat(3_000))]));
+        assert!(utf16_len(&text) <= MESSAGE_LIMIT);
+        assert!(text.chars().count() < MESSAGE_LIMIT);
+        assert!(text.contains('…'));
+        assert_well_formed(&text);
+    }
+
+    #[test]
     fn every_cut_position_stays_well_formed() {
-        let n = notification(vec![("Текст", "a&b<c>d\"e".repeat(10))]);
-        for limit in 0..200 {
+        let n = notification(vec![("Текст", "a&b<c>d\"e🛒".repeat(10))]);
+        // With no room for values at all, only the fixed markup is left.
+        let markup_only = utf16_len(&render_within(&n, 0));
+        for limit in 0..250 {
             let text = render_within(&n, limit);
             assert_well_formed(&text);
+            assert!(utf16_len(&text) <= limit.max(markup_only), "limit {limit}");
         }
     }
 
