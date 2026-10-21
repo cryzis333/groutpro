@@ -33,56 +33,158 @@ const money = value => new Intl.NumberFormat('ru-RU', { style: 'currency', curre
     }
   }
 
-  // Native <option> popups render with the browser's own chrome and ignore most
-  // theme CSS, so the visible dropdown is built here instead. The real <select>
-  // (hidden) keeps holding the value so the rest of this file doesn't change.
+  // Native <option> popups render with the browser's own chrome and ignore most theme CSS,
+  // so the visible dropdown is an ARIA listbox built here (mouse, touch and keyboard:
+  // arrows, Home/End, Enter/Space, Esc, type-ahead). The real <select> (hidden) keeps
+  // holding the value, so the rest of this file reads it as before.
+  const openWidgets = new Set();
+
   function initCustomSelect(selectEl) {
     const root = document.querySelector(`.custom-select[data-for="${selectEl.id}"]`);
-    if (!root) return () => {};
+    if (!root) return { rebuild() {}, syncLabel() {} };
     const trigger = root.querySelector('.custom-select-trigger');
     const label = root.querySelector('.custom-select-label');
     const list = root.querySelector('.custom-select-list');
+    const caption = root.parentElement.querySelector('.shop-filter-label');
 
-    function close() {
+    const listId = `${selectEl.id}-listbox`;
+    trigger.id = trigger.id || `${selectEl.id}-trigger`;
+    list.id = listId;
+    trigger.setAttribute('aria-controls', listId);
+    if (caption) {
+      caption.id = caption.id || `${selectEl.id}-caption`;
+      trigger.setAttribute('aria-labelledby', `${caption.id} ${trigger.id}`);
+      list.setAttribute('aria-labelledby', caption.id);
+      // Clicking the caption focuses the control, like a <label> would (without re-opening it)
+      caption.addEventListener('click', () => trigger.focus());
+    }
+
+    let activeIndex = -1;
+    let typeahead = '';
+    let typeaheadTimer;
+    const options = () => [...list.querySelectorAll('.custom-select-option')];
+    const isOpen = () => root.classList.contains('is-open');
+
+    function setActive(index) {
+      const items = options();
+      if (!items.length) return;
+      activeIndex = Math.max(0, Math.min(index, items.length - 1));
+      items.forEach((li, i) => li.classList.toggle('is-active', i === activeIndex));
+      const active = items[activeIndex];
+      list.setAttribute('aria-activedescendant', active.id);
+      // keep the active option visible inside the scrollable list
+      if (active.offsetTop < list.scrollTop) list.scrollTop = active.offsetTop - 6;
+      else if (active.offsetTop + active.offsetHeight > list.scrollTop + list.clientHeight) {
+        list.scrollTop = active.offsetTop + active.offsetHeight - list.clientHeight + 6;
+      }
+    }
+
+    function close(focusTrigger) {
+      if (!isOpen()) return;
       root.classList.remove('is-open');
       trigger.setAttribute('aria-expanded', 'false');
       list.hidden = true;
+      list.removeAttribute('aria-activedescendant');
+      openWidgets.delete(close);
+      if (focusTrigger) trigger.focus();
     }
+
     function open() {
-      document.querySelectorAll('.custom-select.is-open').forEach(el => { if (el !== root) el.querySelector('.custom-select-trigger').click(); });
+      openWidgets.forEach(closeOther => closeOther(false));
       root.classList.add('is-open');
       trigger.setAttribute('aria-expanded', 'true');
       list.hidden = false;
+      openWidgets.add(close);
+      setActive(Math.max(0, selectEl.selectedIndex));
+      list.focus({ preventScroll: true });
     }
+
+    function choose(index) {
+      const opt = selectEl.options[index];
+      if (opt && selectEl.value !== opt.value) {
+        selectEl.value = opt.value;
+        selectEl.dispatchEvent(new Event('input', { bubbles: true }));
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      syncLabel();
+      close(true);
+    }
+
     function syncLabel() {
       const selected = selectEl.options[selectEl.selectedIndex];
       label.textContent = selected ? selected.textContent : '';
-      list.querySelectorAll('.custom-select-option').forEach(li => {
+      options().forEach(li => {
         li.setAttribute('aria-selected', String(li.dataset.value === selectEl.value));
       });
     }
+
     function rebuild() {
       list.innerHTML = '';
-      [...selectEl.options].forEach(opt => {
+      [...selectEl.options].forEach((opt, i) => {
         const li = document.createElement('li');
         li.className = 'custom-select-option';
+        li.id = `${listId}-opt-${i}`;
         li.setAttribute('role', 'option');
         li.dataset.value = opt.value;
         li.textContent = opt.textContent;
-        li.addEventListener('click', () => {
-          selectEl.value = opt.value;
-          selectEl.dispatchEvent(new Event('input', { bubbles: true }));
-          syncLabel();
-          close();
-        });
         list.appendChild(li);
       });
       syncLabel();
     }
 
-    trigger.addEventListener('click', () => { root.classList.contains('is-open') ? close() : open(); });
-    document.addEventListener('click', (e) => { if (!root.contains(e.target)) close(); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    trigger.addEventListener('click', () => { isOpen() ? close(false) : open(); });
+    trigger.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        open();
+      }
+    });
+
+    list.addEventListener('click', (e) => {
+      const li = e.target.closest('.custom-select-option');
+      if (li) choose(options().indexOf(li));
+    });
+    list.addEventListener('mousemove', (e) => {
+      const li = e.target.closest('.custom-select-option');
+      if (li) {
+        const i = options().indexOf(li);
+        if (i !== activeIndex) setActive(i);
+      }
+    });
+    list.addEventListener('keydown', (e) => {
+      const count = options().length;
+      switch (e.key) {
+        case 'ArrowDown': e.preventDefault(); setActive(activeIndex + 1); break;
+        case 'ArrowUp': e.preventDefault(); setActive(activeIndex - 1); break;
+        case 'Home': e.preventDefault(); setActive(0); break;
+        case 'End': e.preventDefault(); setActive(count - 1); break;
+        case 'PageDown': e.preventDefault(); setActive(activeIndex + 5); break;
+        case 'PageUp': e.preventDefault(); setActive(activeIndex - 5); break;
+        case 'Enter':
+        case ' ':
+          e.preventDefault();
+          if (activeIndex >= 0) choose(activeIndex);
+          break;
+        case 'Escape': e.preventDefault(); e.stopPropagation(); close(true); break;
+        case 'Tab': close(false); break;
+        default:
+          if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            clearTimeout(typeaheadTimer);
+            typeahead += e.key.toLowerCase();
+            typeaheadTimer = setTimeout(() => { typeahead = ''; }, 600);
+            const items = options();
+            const start = typeahead.length === 1 ? activeIndex + 1 : activeIndex;
+            for (let n = 0; n < items.length; n++) {
+              const i = (start + n) % items.length;
+              if (items[i].textContent.trim().toLowerCase().startsWith(typeahead)) { setActive(i); break; }
+            }
+          }
+      }
+    });
+    list.addEventListener('focusout', (e) => {
+      if (!root.contains(e.relatedTarget)) close(false);
+    });
+    document.addEventListener('click', (e) => { if (!root.contains(e.target)) close(false); });
 
     rebuild();
     return { rebuild, syncLabel };
@@ -105,21 +207,22 @@ const money = value => new Intl.NumberFormat('ru-RU', { style: 'currency', curre
     grid.innerHTML = items.map(product => {
       const hasDiscount = product.discount_percent_bps > 0;
       const appliesNow = hasDiscount && (!product.discount_registered_only || isRegistered);
+      const unit = escapeHtml(unitSuffix(product));
       let priceRow;
       if (appliesNow) {
         priceRow = `<div class="shop-price-row">
-             <span class="shop-price">${isService(product) ? 'от ' : ''}${money(finalPrice(product))}${unitSuffix(product)}</span>
+             <span class="shop-price">${isService(product) ? 'от ' : ''}${money(finalPrice(product))}${unit}</span>
              <span class="shop-price-old">${money(product.price)}</span>
              <span class="shop-discount-badge">-${product.discount_percent_bps / 100}%</span>
            </div>`;
       } else if (hasDiscount) {
         priceRow = `<div class="shop-price-row">
-             <span class="shop-price">${isService(product) ? 'от ' : ''}${money(product.price)}${unitSuffix(product)}</span>
+             <span class="shop-price">${isService(product) ? 'от ' : ''}${money(product.price)}${unit}</span>
              <span class="shop-discount-badge">-${product.discount_percent_bps / 100}% для зарегистрированных</span>
            </div>`;
       } else {
         priceRow = product.price > 0
-          ? `<div class="shop-price-row"><span class="shop-price">${isService(product) ? 'от ' : ''}${money(product.price)}${unitSuffix(product)}</span></div>`
+          ? `<div class="shop-price-row"><span class="shop-price">${isService(product) ? 'от ' : ''}${money(product.price)}${unit}</span></div>`
           : `<div class="shop-price-row"><span class="shop-price shop-price--quote">Цена по запросу</span></div>`;
       }
       return `
@@ -142,8 +245,12 @@ const money = value => new Intl.NumberFormat('ru-RU', { style: 'currency', curre
     const params = new URLSearchParams(location.search);
     search.value = params.get('q') || '';
     category.value = params.get('category') || '';
+    if (category.selectedIndex < 0) category.value = '';
     sort.value = params.get('sort') || 'newest';
+    if (sort.selectedIndex < 0) sort.value = 'newest';
   }
+
+  const hasFilters = () => !!(search.value.trim() || category.value || sort.value !== 'newest');
 
   async function loadProducts() {
     try {
@@ -164,24 +271,29 @@ const money = value => new Intl.NumberFormat('ru-RU', { style: 'currency', curre
       syncFromUrl();
       categoryWidget.syncLabel();
       sortWidget.syncLabel();
-      await loadFilteredProducts();
+      // The unfiltered list is already here — a second request is only needed for filters
+      if (hasFilters()) await loadFilteredProducts();
+      else render(products);
     } catch {
       grid.innerHTML = '<p class="shop-empty">Не удалось загрузить каталог. Попробуйте обновить страницу.</p>';
     }
   }
 
+  let requestSeq = 0;
   async function loadFilteredProducts() {
     const params = new URLSearchParams({ page_size: '100' });
     if (search.value.trim()) params.set('q', search.value.trim());
     if (category.value) params.set('category', category.value);
     if (sort.value !== 'newest') params.set('sort', sort.value);
+    const seq = ++requestSeq;
     grid.innerHTML = '<p class="shop-empty">Загрузка товаров...</p>';
     try {
       const response = await fetch(`/api/products?${params}`);
       if (!response.ok) throw new Error('catalog request failed');
-      render(await response.json());
+      const items = await response.json();
+      if (seq === requestSeq) render(items);   // ignore answers to outdated queries
     } catch {
-      grid.innerHTML = '<p class="shop-empty">Не удалось загрузить каталог. Попробуйте обновить страницу.</p>';
+      if (seq === requestSeq) grid.innerHTML = '<p class="shop-empty">Не удалось загрузить каталог. Попробуйте обновить страницу.</p>';
     }
   }
 
