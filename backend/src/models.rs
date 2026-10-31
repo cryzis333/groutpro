@@ -16,6 +16,8 @@ pub struct Product {
     #[sqlx(default)]
     pub unit: Option<String>,
     pub stock: i32,
+    /// Manual catalog position (ascending); 1000 by default.
+    pub sort_order: i32,
     pub archived_at: Option<DateTime<Utc>>,
     pub is_published: bool,
     pub created_at: DateTime<Utc>,
@@ -35,6 +37,9 @@ pub struct CreateProductRequest {
     #[serde(default)]
     pub unit: Option<String>,
     pub stock: i32,
+    /// Absent — the current position is kept.
+    #[serde(default)]
+    pub sort_order: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -51,6 +56,10 @@ pub struct Order {
     pub paid_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// `sbp` (online via YooKassa) or `invoice` (bank transfer for companies).
+    pub payment_method: Option<String>,
+    pub company_name: Option<String>,
+    pub company_inn: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -69,8 +78,6 @@ pub struct CreateOrderRequest {
     pub company_inn: Option<String>,
     #[serde(default)]
     pub consent: bool,
-    #[serde(default)]
-    pub not_robot: bool,
     #[serde(default)]
     pub website: Option<String>,
 }
@@ -115,10 +122,27 @@ pub struct CategoryViewCount {
     pub views: i64,
 }
 
+#[derive(Debug, Serialize, FromRow)]
+pub struct DailyViewCount {
+    /// `YYYY-MM-DD`
+    pub date: String,
+    pub views: i64,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+pub struct PageViewCount {
+    pub path: String,
+    pub views: i64,
+}
+
 #[derive(Debug, Serialize)]
 pub struct ViewStats {
     pub total_views: i64,
     pub categories: Vec<CategoryViewCount>,
+    /// The last 30 days including today, oldest first; days without views are 0.
+    pub daily: Vec<DailyViewCount>,
+    /// Top 10 pages of the last 30 days.
+    pub pages: Vec<PageViewCount>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -145,8 +169,6 @@ pub struct CustomerRegisterRequest {
     pub password: String,
     #[serde(default)]
     pub consent: bool,
-    #[serde(default)]
-    pub not_robot: bool,
     #[serde(default)]
     pub website: Option<String>,
 }

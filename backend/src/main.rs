@@ -1,6 +1,7 @@
 mod config;
 mod db;
 mod error;
+mod extract;
 mod handlers;
 mod middleware;
 mod models;
@@ -27,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
     if std::env::args().nth(1).as_deref() == Some("notify-test") {
         return services::notify::cli_self_test().await;
     }
-    let cfg = config::Config::from_env();
+    let cfg = config::Config::from_env()?;
     let pool = db::init(&cfg.database_url).await?;
 
     let upload_dir = cfg.upload_dir.clone();
@@ -50,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .route(
             "/api/admin/products",
-            post(handlers::products::create_product),
+            get(handlers::products::list_admin_products).post(handlers::products::create_product),
         )
         .route(
             "/api/admin/products/:id",
@@ -96,6 +97,7 @@ async fn main() -> anyhow::Result<()> {
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024));
 
     let app = Router::new()
+        .route("/health", get(|| async { "ok" }))
         .route("/api/products", get(handlers::products::list_products))
         .route("/api/products/:id", get(handlers::products::get_product))
         .route("/api/orders", post(handlers::orders::create_order))
@@ -123,10 +125,7 @@ async fn main() -> anyhow::Result<()> {
             "/api/account/profile",
             axum::routing::patch(handlers::customer_auth::update_profile),
         )
-        .route(
-            "/api/analytics/view",
-            post(handlers::analytics::track_view),
-        )
+        .route("/api/analytics/view", post(handlers::analytics::track_view))
         .route(
             "/api/contact",
             post(handlers::contacts::create_contact_request),
@@ -149,7 +148,13 @@ async fn main() -> anyhow::Result<()> {
                         .and_then(|origin| origin.parse::<HeaderValue>().ok())
                         .unwrap_or_else(|| HeaderValue::from_static("http://localhost:3000")),
                 )
-                .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PATCH])
+                .allow_methods([
+                    Method::GET,
+                    Method::POST,
+                    Method::PUT,
+                    Method::PATCH,
+                    Method::DELETE,
+                ])
                 .allow_headers(Any),
         )
         .layer(SetResponseHeaderLayer::overriding(
@@ -158,11 +163,21 @@ async fn main() -> anyhow::Result<()> {
         ))
         .nest_service("/uploads", ServeDir::new(&upload_dir))
         .nest_service("/", ServeDir::new("frontend"))
+        // Added last so they cover the API, uploads and static pages alike.
+        .layer(SetResponseHeaderLayer::if_not_present(
+            HeaderName::from_static("x-content-type-options"),
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            HeaderName::from_static("referrer-policy"),
+            HeaderValue::from_static("strict-origin-when-cross-origin"),
+        ))
         .with_state(state);
 
-    // Only nginx on this host talks to the backend; don't listen on the LAN.
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", cfg.server_port)).await?;
-    tracing::info!("Server running on port {}", cfg.server_port);
+    // Default 127.0.0.1: only nginx on this host talks to the backend. A container
+    // sets SERVER_HOST=0.0.0.0.
+    let listener = TcpListener::bind((cfg.server_host.as_str(), cfg.server_port)).await?;
+    tracing::info!("Server listening on {}", listener.local_addr()?);
     axum::serve(listener, app).await?;
     Ok(())
 }

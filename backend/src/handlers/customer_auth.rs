@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 use crate::{
     error::AppError,
+    extract::AppJson,
     models::{
         CustomerLoginRequest, CustomerOrder, CustomerProfile, CustomerRegisterRequest,
         UpdateProfileRequest,
@@ -25,17 +26,19 @@ const SESSION_LIFETIME_SECONDS: i64 = 60 * 60 * 24 * 14;
 #[derive(FromRow)]
 struct StoredUser {
     id: Uuid,
-    email: String,
-    display_name: String,
     password_hash: String,
     role: String,
 }
 
 pub async fn register(
     State(state): State<AppState>,
-    Json(req): Json<CustomerRegisterRequest>,
+    AppJson(req): AppJson<CustomerRegisterRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    if req.website.as_deref().is_some_and(|value| !value.trim().is_empty()) {
+    if req
+        .website
+        .as_deref()
+        .is_some_and(|value| !value.trim().is_empty())
+    {
         return Err(AppError::Validation(
             "Проверьте форму и попробуйте снова".to_string(),
         ));
@@ -59,11 +62,18 @@ pub async fn register(
         ));
     }
 
-    let salt = argon2::password_hash::SaltString::generate(&mut OsRng);
-    let password_hash = Argon2::default()
-        .hash_password(req.password.as_bytes(), &salt)
-        .map_err(|_| AppError::Internal("Не удалось создать аккаунт".to_string()))?
-        .to_string();
+    // Argon2 deliberately takes tens of milliseconds and ~19 MiB: run it on the
+    // blocking pool so a burst of sign-ups doesn't stall the async workers.
+    let password = req.password;
+    let password_hash = tokio::task::spawn_blocking(move || {
+        let salt = argon2::password_hash::SaltString::generate(&mut OsRng);
+        Argon2::default()
+            .hash_password(password.as_bytes(), &salt)
+            .map(|hash| hash.to_string())
+    })
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?
+    .map_err(|_| AppError::Internal("Не удалось создать аккаунт".to_string()))?;
     let user = sqlx::query_as::<_, CustomerProfile>(
         "INSERT INTO users (email, password_hash, display_name)
          VALUES ($1, $2, $3)
@@ -86,24 +96,30 @@ pub async fn register(
 
 pub async fn login(
     State(state): State<AppState>,
-    Json(req): Json<CustomerLoginRequest>,
+    AppJson(req): AppJson<CustomerLoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let email = req.email.trim().to_lowercase();
+    let CustomerLoginRequest { email, password } = req;
+    let email = email.trim().to_lowercase();
     let user = sqlx::query_as::<_, StoredUser>(
-        "SELECT id, email, display_name, password_hash, role FROM users WHERE LOWER(email) = LOWER($1)",
+        "SELECT id, password_hash, role FROM users WHERE LOWER(email) = LOWER($1)",
     )
     .bind(&email)
     .fetch_optional(&state.pool)
     .await?
-    .ok_or(AppError::Unauthorized)?;
+    .ok_or(AppError::InvalidCredentials)?;
 
-    let hash = PasswordHash::new(&user.password_hash).map_err(|_| AppError::Unauthorized)?;
-    if user.role != "customer"
-        || Argon2::default()
-            .verify_password(req.password.as_bytes(), &hash)
-            .is_err()
-    {
-        return Err(AppError::Unauthorized);
+    let stored_hash = user.password_hash;
+    let password_ok = tokio::task::spawn_blocking(move || {
+        PasswordHash::new(&stored_hash).is_ok_and(|hash| {
+            Argon2::default()
+                .verify_password(password.as_bytes(), &hash)
+                .is_ok()
+        })
+    })
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+    if user.role != "customer" || !password_ok {
+        return Err(AppError::InvalidCredentials);
     }
 
     let profile = sqlx::query_as::<_, CustomerProfile>(
@@ -129,7 +145,9 @@ pub async fn logout(
     let mut response = StatusCode::NO_CONTENT.into_response();
     response.headers_mut().append(
         header::SET_COOKIE,
-        HeaderValue::from_static("groutpro_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"),
+        HeaderValue::from_static(
+            "groutpro_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
+        ),
     );
     response
 }
@@ -144,7 +162,7 @@ pub async fn me(
 pub async fn update_profile(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
-    Json(req): Json<UpdateProfileRequest>,
+    AppJson(req): AppJson<UpdateProfileRequest>,
 ) -> Result<Json<CustomerProfile>, AppError> {
     let current = current_customer(&state, &headers).await?;
 
@@ -152,11 +170,19 @@ pub async fn update_profile(
     if name.is_empty() || name.len() > 120 {
         return Err(AppError::Validation("Проверьте имя".to_string()));
     }
-    let phone = req.phone.as_deref().map(str::trim).filter(|v| !v.is_empty());
+    let phone = req
+        .phone
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty());
     if phone.is_some_and(|v| v.len() > 32) {
         return Err(AppError::Validation("Проверьте телефон".to_string()));
     }
-    let address = req.address.as_deref().map(str::trim).filter(|v| !v.is_empty());
+    let address = req
+        .address
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty());
     if address.is_some_and(|v| v.len() > 500) {
         return Err(AppError::Validation("Слишком длинный адрес".to_string()));
     }
@@ -218,7 +244,10 @@ async fn session_response(
         .execute(&state.pool)
         .await?;
     let mut response = Json(user).into_response();
-    let cookie = format!("{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age={SESSION_LIFETIME_SECONDS}");
+    // Secure: the session must never travel over plain HTTP (nginx also listens on 80).
+    let cookie = format!(
+        "{SESSION_COOKIE}={token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age={SESSION_LIFETIME_SECONDS}"
+    );
     response.headers_mut().append(
         header::SET_COOKIE,
         HeaderValue::from_str(&cookie)

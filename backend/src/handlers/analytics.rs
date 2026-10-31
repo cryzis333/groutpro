@@ -1,6 +1,10 @@
 use crate::{
     error::AppError,
-    models::{CategoryViewCount, DailyAnalytics, TrackViewRequest, ViewStats},
+    extract::AppJson,
+    models::{
+        CategoryViewCount, DailyAnalytics, DailyViewCount, PageViewCount, TrackViewRequest,
+        ViewStats,
+    },
     state::AppState,
 };
 use axum::{extract::State, http::StatusCode, Json};
@@ -9,12 +13,14 @@ pub async fn get_analytics(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<DailyAnalytics>>, AppError> {
     let data = sqlx::query_as::<_, DailyAnalytics>(
-        "SELECT DATE_TRUNC('day', created_at) as date, SUM(total_amount) as revenue, COUNT(*) as orders_count
+        // SUM(BIGINT) is NUMERIC in Postgres; sqlx needs BIGINT for the i64 field.
+        "SELECT DATE_TRUNC('day', created_at) AS date, SUM(total_amount)::BIGINT AS revenue,
+                COUNT(*) AS orders_count
          FROM orders
          WHERE status = 'paid'
          GROUP BY DATE_TRUNC('day', created_at)
          ORDER BY date DESC
-         LIMIT 30"
+         LIMIT 30",
     )
     .fetch_all(&state.pool)
     .await?;
@@ -23,11 +29,13 @@ pub async fn get_analytics(
 
 pub async fn track_view(
     State(state): State<AppState>,
-    Json(req): Json<TrackViewRequest>,
+    AppJson(req): AppJson<TrackViewRequest>,
 ) -> Result<StatusCode, AppError> {
     let path = req.path.trim();
     if path.is_empty() || path.len() > 512 {
-        return Err(AppError::BadRequest("Invalid path".into()));
+        return Err(AppError::BadRequest(
+            "Некорректный адрес страницы".to_string(),
+        ));
     }
     let category = req
         .category
@@ -47,7 +55,10 @@ pub async fn track_view(
 
 pub async fn get_view_stats(State(state): State<AppState>) -> Result<Json<ViewStats>, AppError> {
     let total_views: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM page_views WHERE created_at > NOW() - INTERVAL '30 days'",
+        // Rows whose path contains '#' are section-topic events from the landing page,
+        // not page loads: they count only towards `categories`.
+        "SELECT COUNT(*) FROM page_views
+         WHERE created_at > NOW() - INTERVAL '30 days' AND path NOT LIKE '%#%'",
     )
     .fetch_one(&state.pool)
     .await?;
@@ -62,8 +73,31 @@ pub async fn get_view_stats(State(state): State<AppState>) -> Result<Json<ViewSt
     .fetch_all(&state.pool)
     .await?;
 
+    let daily = sqlx::query_as::<_, DailyViewCount>(
+        "SELECT TO_CHAR(day, 'YYYY-MM-DD') AS date, COUNT(v.id) AS views
+         FROM generate_series(CURRENT_DATE - 29, CURRENT_DATE, INTERVAL '1 day') AS day
+         LEFT JOIN page_views v ON v.created_at >= day AND v.created_at < day + INTERVAL '1 day'
+              AND v.path NOT LIKE '%#%'
+         GROUP BY day
+         ORDER BY day",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+
+    let pages = sqlx::query_as::<_, PageViewCount>(
+        "SELECT path, COUNT(*) AS views FROM page_views
+         WHERE created_at > NOW() - INTERVAL '30 days' AND path NOT LIKE '%#%'
+         GROUP BY path
+         ORDER BY views DESC, path
+         LIMIT 10",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+
     Ok(Json(ViewStats {
         total_views,
         categories,
+        daily,
+        pages,
     }))
 }

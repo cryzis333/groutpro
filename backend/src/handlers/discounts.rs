@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
-use crate::{error::AppError, state::AppState};
+use crate::{error::AppError, extract::AppJson, state::AppState};
 
 #[derive(Debug, Serialize, FromRow)]
 pub struct Discount {
@@ -42,7 +42,7 @@ pub async fn list_discounts(
 
 pub async fn create_discount(
     State(state): State<AppState>,
-    Json(req): Json<CreateDiscountRequest>,
+    AppJson(req): AppJson<CreateDiscountRequest>,
 ) -> Result<Json<Discount>, AppError> {
     let category = req
         .category
