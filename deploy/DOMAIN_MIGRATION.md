@@ -248,7 +248,7 @@ curl -s $R -X POST https://serious-company.ru/api/payments/webhook -H 'Content-T
 curl -s $R https://groutpro.ru/health; echo                                                          # ok
 for p in /shop /cart /account /privacy-policy /admin /admin/login /sitemap.xml /robots.txt "/api/products?page_size=1"; do printf '%-28s %s\n' "$p" "$(curl -s -o /dev/null -w '%{http_code}' $R "https://groutpro.ru$p")"; done   # всё 200
 curl -sI $R https://groutpro.ru/ | grep -i -E '^(HTTP|x-content-type-options|referrer-policy|x-frame-options)'
-curl -sI -H 'Accept-Encoding: gzip' $R https://groutpro.ru/css/style.css | grep -i -E '^(cache-control|content-encoding)'   # no-cache, gzip
+curl -s -o /dev/null -D - -H 'Accept-Encoding: gzip' $R https://groutpro.ru/css/style.css | grep -i -E '^(cache-control|content-encoding)'   # no-cache, gzip (GET: на HEAD nginx gzip не включает)
 ```
 
 Лимит на вход в админку: первые 6 ответов — 4xx от backend, дальше 429 с JSON. После проверки

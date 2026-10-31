@@ -37,12 +37,15 @@ ENV_FILE=/etc/groutpro.env
 NOTIFY_FILE=$APP/secrets/notify.env
 D=serious-company.ru                   # текущий домен сайта; после переезда — groutpro.ru
 BK=/srv/backups/groutpro-next/$(date +%F-%H%M)
+# Имя базы из DATABASE_URL; сам URL с паролем на экран не выводится
+DB=$(sudo awk '/^DATABASE_URL=/{ v=$0; sub(/^DATABASE_URL=/, "", v); gsub(/["\047\r]/, "", v); sub(/^[^@]*@/, "", v); sub(/[?#].*$/, "", v); n=split(v, a, "/"); print (n > 1 ? a[n] : "") }' "$ENV_FILE")
+case "$DB" in ""|*[:@]*) echo "Не удалось определить имя базы — проверьте DATABASE_URL в $ENV_FILE"; DB= ;; *) echo "БД: $DB" ;; esac
 ```
 
 Если сессия оборвалась после шага 2, `BK` должен указывать на уже созданную копию, а не на новую:
 
 ```bash
-BK=$(sudo ls -d /srv/backups/groutpro-next/*/ | sort | sed -n '$p'); BK=${BK%/}; echo "$BK"
+BK=$(sudo ls -d /srv/backups/groutpro-next/20*/ | sort | sed -n '$p'); BK=${BK%/}; echo "$BK"   # копии domain-* (переезд) не берём
 ```
 
 ## 1. Проверки перед началом (ничего не меняют)
@@ -94,8 +97,8 @@ sed -n '1,250p' ~/server-check-before.txt           # весь отчёт (се�
 sudo install -d -m 700 "$BK"
 cd /
 
-# 2.1 Имя базы из DATABASE_URL — сам URL с паролем на экран не выводится
-DB=$(sudo awk -F/ '/^DATABASE_URL=/{ sub(/[?"\047\r].*$/, "", $NF); print $NF }' "$ENV_FILE"); echo "БД: $DB"
+# 2.1 Имя базы уже в $DB (шаг 0). Пусто — дальше не идём.
+echo "БД: ${DB:?сначала выполните блок из шага 0}"
 sudo grep -c '^DATABASE_URL=' "$NOTIFY_FILE" 2>/dev/null   # 0 или пусто — notify.env базу не переопределяет
 
 # 2.2 Дамп базы (custom-формат для pg_restore)
@@ -384,11 +387,11 @@ sudo -u postgres psql -X -d "$DB" -Atc "SELECT max(version) FROM _sqlx_migration
 # переменные из шага 0, затем:
 cd "$APP" && git fetch origin
 git log --oneline HEAD.."origin/$BRANCH"               # что придёт
-git diff --stat HEAD "origin/$BRANCH" -- backend       # пусто — меняется только статика (11.1)
+git diff --stat HEAD "origin/$BRANCH" -- backend ':!backend/.env.example'   # пусто — меняется только статика (11.1)
 git diff --stat HEAD "origin/$BRANCH" -- backend/migrations   # не пусто — читайте миграции до выкладки
 ```
 
-Дальше: копия (шаги 2.2 и 2.4), `git checkout -f -B deploy "origin/$BRANCH"`, сборка (5),
+Дальше: копия (шаг 2 целиком, 2.3 можно пропустить), `git checkout -f -B deploy "origin/$BRANCH"`, сборка (5),
 перезапуск и проверки (7, 8). Откат: `git checkout -f -B rollback <прошлый коммит из $BK/git-head.txt>`
 плюс бинарник из копии.
 
