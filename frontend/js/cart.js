@@ -86,6 +86,8 @@ function renderCart() {
         return;
     }
     if (form) form.hidden = false;
+    const totalRow = document.querySelector('.cart-total');
+    if (totalRow) totalRow.hidden = false;
     let total = 0;
     container.innerHTML = cartItems.map((item, i) => {
         const blocked = isBlocked(item);
@@ -200,6 +202,8 @@ function showOrderDone(orderNumber) {
             <p>Заявка на счёт принята, номер <strong>${escapeHtml(String(orderNumber || ''))}</strong>. Счёт и договор пришлём на указанную почту в рабочее время.</p>
             <p><a href="/shop" class="inline-link cart-empty-link">Перейти в магазин ${ICON_ARROW_RIGHT}</a></p>
         </div>`;
+    const totalRow = document.querySelector('.cart-total');
+    if (totalRow) totalRow.hidden = true;   // «Итого: 0 ₽» under the confirmation only confuses
     const done = container.querySelector('.cart-done');
     done.focus({ preventScroll: true });
     done.scrollIntoView({ block: 'center', behavior: 'smooth' });

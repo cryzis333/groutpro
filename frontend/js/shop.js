@@ -182,7 +182,9 @@ const money = value => new Intl.NumberFormat('ru-RU', { style: 'currency', curre
       }
     });
     list.addEventListener('focusout', (e) => {
-      if (!root.contains(e.relatedTarget)) close(false);
+      // relatedTarget is null when Safari/Firefox click the (unfocusable) trigger button;
+      // outside clicks are handled by the document listener below
+      if (e.relatedTarget && !root.contains(e.relatedTarget)) close(false);
     });
     document.addEventListener('click', (e) => { if (!root.contains(e.target)) close(false); });
 

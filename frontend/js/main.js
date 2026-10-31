@@ -128,10 +128,25 @@
 
   if (menuBtn && mobileMenu) {
     const isMenuOpen = () => mobileMenu.classList.contains('active');
+    // While the menu covers the page, Tab must not wander into the hidden page behind it
+    const inertedByMenu = new Set();
+    const setPageInert = on => {
+      if (on) {
+        Array.from(document.body.children).forEach(el => {
+          if (el === mobileMenu || el.contains(menuBtn) || el.tagName === 'SCRIPT' || el.hasAttribute('inert')) return;
+          el.setAttribute('inert', '');
+          inertedByMenu.add(el);
+        });
+      } else {
+        inertedByMenu.forEach(el => el.removeAttribute('inert'));
+        inertedByMenu.clear();
+      }
+    };
 
     const setMenu = (open, restoreFocus) => {
       mobileMenu.classList.toggle('active', open);
       mobileMenu.toggleAttribute('inert', !open);
+      setPageInert(open);
       menuBtn.classList.toggle('active', open);
       menuBtn.setAttribute('aria-expanded', String(open));
       menuBtn.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню');
