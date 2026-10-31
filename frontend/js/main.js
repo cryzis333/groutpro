@@ -41,15 +41,31 @@
   }
 
 
-  // Site visit tracking
-  try {
-    fetch('/api/analytics/view', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: location.pathname }),
-      keepalive: true
-    }).catch(() => {});
-  } catch (e) {}
+  // Учёт посещений: один просмотр на загрузку страницы, без ожидания ответа и без ошибок.
+  // Страница товара отправляет просмотр с категорией товара (product.js свой больше не шлёт).
+  const sendView = category => {
+    try {
+      fetch('/api/analytics/view', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(category ? { path: location.pathname, category } : { path: location.pathname }),
+        keepalive: true
+      }).catch(() => {});
+    } catch (e) {}
+  };
+  if (document.getElementById('prod-title')) {
+    const productId = new URLSearchParams(location.search).get('id')
+      || (location.pathname.match(/^\/product\/([0-9a-fA-F-]{36})\/?$/) || [])[1];
+    // Без id product.js сразу уводит в каталог — там просмотр и засчитается
+    if (productId) {
+      fetch('/api/products/' + encodeURIComponent(productId))
+        .then(r => (r.ok ? r.json() : null))
+        .catch(() => null)
+        .then(p => sendView(p && p.category));
+    }
+  } else {
+    sendView(null);
+  }
 
   // Theme toggle
   const themeToggle = document.getElementById('themeToggle');
@@ -375,6 +391,7 @@
 
     const recalc = () => {
       let total = 0;
+      let quote = false; // выбрана хотя бы одна позиция «по запросу»
       priceList.forEach((item, i) => {
         const row = document.getElementById('estimate-row-' + i);
         if (!row) return;
@@ -382,17 +399,25 @@
         const sum = item.price;
         row.classList.toggle('is-on', on);
         const sumEl = row.querySelector('.estimate-item-sum');
-        if (sumEl) sumEl.textContent = on ? rub(sum) : '';
-        if (on) total += sum;
+        if (sumEl) sumEl.textContent = on ? (sum > 0 ? rub(sum) : 'по запросу') : '';
+        if (on && sum > 0) total += sum;
+        if (on && !(sum > 0)) quote = true;
       });
-      document.getElementById('estimate-works').textContent = rub(total);
-      document.getElementById('estimate-total').textContent = rub(total);
+      // Только позиции «по запросу» — показываем «по запросу», а не «0 ₽»
+      const quoteOnly = total === 0 && quote;
+      const totalText = quoteOnly ? 'по запросу' : rub(total);
+      document.getElementById('estimate-works').textContent = totalText;
+      document.getElementById('estimate-total').textContent = totalText;
+      const totalLabel = document.querySelector('.estimate-row--total span');
+      if (totalLabel) totalLabel.textContent = quoteOnly ? 'Стоимость' : 'Ориентировочно от';
+      estimateBox.dataset.total = String(total);
     };
 
     fetch('/api/products?page_size=50')
       .then(r => r.json())
       .then(products => {
-        priceList = (products || []).filter(p => p.price > 0);
+        // Цена 0 — «по запросу»: позицию показываем, но в сумму она не входит
+        priceList = (products || []).filter(p => p.price >= 0);
         if (!priceList.length) {
           estimateBox.innerHTML = '<p style="color:var(--muted)">Прайс появится, когда в магазине будут позиции.</p>';
           return;
@@ -401,7 +426,7 @@
           '<label class="estimate-item" id="estimate-row-' + i + '">' +
             '<input type="checkbox" aria-label="Включить в смету: ' + escapeText(p.title) + '">' +
             '<span class="estimate-item-title">' + escapeText(p.title) +
-              '<small>' + escapeText(p.category || 'услуга') + ' &middot; ' + (p.unit && p.unit !== 'шт' ? 'от ' : '') + rub(p.price) + (p.unit ? ' / ' + escapeText(p.unit) : '') + '</small>' +
+              '<small>' + escapeText(p.category || 'услуга') + ' &middot; ' + (p.price > 0 ? (p.unit && p.unit !== 'шт' ? 'от ' : '') + rub(p.price) + (p.unit ? ' / ' + escapeText(p.unit) : '') : 'цена по запросу') + '</small>' +
             '</span>' +
             '<span class="estimate-item-sum"></span>' +
           '</label>'
@@ -428,7 +453,7 @@
       estimateStatus.classList.remove('is-error', 'is-success');
       // Работы человека может не быть в списке — форму всё равно открываем
       document.getElementById('estimate-chosen').textContent = chosen.length
-        ? `· ${chosen.length} ${plural(chosen.length, 'позиция', 'позиции', 'позиций')}, ориентировочно от ${document.getElementById('estimate-total').textContent}`
+        ? `· ${chosen.length} ${plural(chosen.length, 'позиция', 'позиции', 'позиций')}, ${Number(estimateBox.dataset.total) > 0 ? 'ориентировочно от ' + rub(Number(estimateBox.dataset.total)) : 'стоимость по запросу'}`
         : '· опишите задачу, подберём работы и посчитаем сами';
       estimateForm.hidden = false;
       await fillContactFields({
@@ -568,4 +593,81 @@
     });
   }
 
+})();
+
+// ============================================================================
+// Аналитика направлений на главной + цвет панели браузера.
+// Самостоятельные блоки: не используют код выше, сетевые ошибки глушатся.
+// ============================================================================
+
+// --- Какие направления смотрят: «Инъектирование бетона», «Гидроизоляция»,
+// «Стабилизация грунта». Заголовок карточки в index.html помечен data-topic.
+// Когда карточка видна хотя бы наполовину не меньше секунды, отправляем
+// просмотр с этой категорией — по одному разу на направление за загрузку.
+// Путь вида «/#services» (раздел, где увидели) отличает такие события от
+// просмотров страниц: у настоящих страниц в пути нет «#».
+(function () {
+  'use strict';
+  const markers = document.querySelectorAll('[data-topic]');
+  if (!markers.length || !('IntersectionObserver' in window)) return;
+
+  const MIN_VISIBLE_MS = 1000;
+  const topicOf = new Map();   // карточка → направление
+  const timers = new Map();    // карточка → таймер «видна достаточно долго»
+  const sent = new Set();      // направления, уже отправленные с этой загрузки
+
+  const report = (topic, card) => {
+    const section = card.closest('section[id]');
+    try {
+      fetch('/api/analytics/view', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: location.pathname + '#' + (section ? section.id : 'topic'), category: topic }),
+        keepalive: true
+      }).catch(() => {});
+    } catch (e) {}
+  };
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      const card = entry.target;
+      const topic = topicOf.get(card);
+      if (!entry.isIntersecting) {
+        clearTimeout(timers.get(card));
+        timers.delete(card);
+        return;
+      }
+      if (sent.has(topic) || timers.has(card)) return;
+      timers.set(card, setTimeout(() => {
+        timers.delete(card);
+        if (sent.has(topic)) return;
+        sent.add(topic);
+        report(topic, card);
+        topicOf.forEach((t, el) => { if (t === topic) observer.unobserve(el); });
+      }, MIN_VISIBLE_MS));
+    });
+  }, { threshold: 0.5 });
+
+  markers.forEach(marker => {
+    const topic = marker.dataset.topic.trim();
+    const card = marker.closest('.card') || marker;
+    if (!topic || topicOf.has(card)) return;
+    topicOf.set(card, topic);
+    observer.observe(card);
+  });
+})();
+
+// --- <meta name="theme-color"> следует за темой сайта (переключатель в шапке),
+// а не только за системной: цвет берём из --bg текущей темы.
+(function () {
+  'use strict';
+  const metas = document.querySelectorAll('meta[name="theme-color"]');
+  if (!metas.length) return;
+  const root = document.documentElement;
+  const apply = () => {
+    const color = getComputedStyle(root).getPropertyValue('--bg').trim();
+    if (color) metas.forEach(meta => meta.setAttribute('content', color));
+  };
+  apply();
+  new MutationObserver(apply).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
 })();
