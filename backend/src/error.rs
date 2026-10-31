@@ -16,6 +16,9 @@ pub enum AppError {
     NotFound,
     #[error("Unauthorized")]
     Unauthorized,
+    /// Wrong e-mail or password on customer login (kept apart from a missing session).
+    #[error("Invalid credentials")]
+    InvalidCredentials,
     #[error("Internal error: {0}")]
     Internal(String),
     #[error("Bad request: {0}")]
@@ -37,6 +40,10 @@ impl IntoResponse for AppError {
             AppError::Unauthorized => (
                 StatusCode::UNAUTHORIZED,
                 "Требуется авторизация".to_string(),
+            ),
+            AppError::InvalidCredentials => (
+                StatusCode::UNAUTHORIZED,
+                "Неверный email или пароль".to_string(),
             ),
             AppError::Internal(error) => {
                 tracing::error!(%error, "internal request failed");

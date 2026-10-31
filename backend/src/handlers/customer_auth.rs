@@ -106,7 +106,7 @@ pub async fn login(
     .bind(&email)
     .fetch_optional(&state.pool)
     .await?
-    .ok_or(AppError::Unauthorized)?;
+    .ok_or(AppError::InvalidCredentials)?;
 
     let stored_hash = user.password_hash;
     let password_ok = tokio::task::spawn_blocking(move || {
@@ -119,7 +119,7 @@ pub async fn login(
     .await
     .map_err(|e| AppError::Internal(e.to_string()))?;
     if user.role != "customer" || !password_ok {
-        return Err(AppError::Unauthorized);
+        return Err(AppError::InvalidCredentials);
     }
 
     let profile = sqlx::query_as::<_, CustomerProfile>(
