@@ -30,6 +30,16 @@ struct CheckoutProduct {
     price: i64,
     stock: i32,
     category: Option<String>,
+    unit: Option<String>,
+}
+
+/// Only piece goods («шт» or no unit) are limited by stock. Contract work priced
+/// per м², пог. м, ввод or объект has no stock and is never written off.
+pub fn tracks_stock(unit: Option<&str>) -> bool {
+    match unit.map(str::trim) {
+        None | Some("") => true,
+        Some(unit) => unit == "шт",
+    }
 }
 
 #[derive(FromRow)]
@@ -63,7 +73,7 @@ pub async fn create_pending_order(
 
     for (product_id, quantity) in lines {
         let product = sqlx::query_as::<_, CheckoutProduct>(
-            "SELECT id, title, price, stock, category FROM products
+            "SELECT id, title, price, COALESCE(stock, 0) AS stock, category, unit FROM products
              WHERE id = $1 AND archived_at IS NULL AND is_published = TRUE
              FOR UPDATE",
         )
@@ -83,7 +93,7 @@ pub async fn create_pending_order(
                 product.title
             )));
         }
-        if product.stock < quantity {
+        if tracks_stock(product.unit.as_deref()) && product.stock < quantity {
             return Err(AppError::Validation(format!(
                 "Недостаточно товара «{}» на складе",
                 product.title
@@ -275,7 +285,7 @@ fn validate_order_request(req: &CreateOrderRequest) -> Result<(), AppError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{final_price_for, merge_order_lines, DiscountRow};
+    use super::{final_price_for, merge_order_lines, tracks_stock, DiscountRow};
     use crate::models::OrderItemRequest;
     use uuid::Uuid;
 
@@ -331,5 +341,16 @@ mod tests {
             vec![(Uuid::from_u128(7), 1), (Uuid::from_u128(8), 100)]
         );
         assert!(merge_order_lines(&[]).is_empty());
+    }
+
+    #[test]
+    fn only_piece_goods_track_stock() {
+        assert!(tracks_stock(None));
+        assert!(tracks_stock(Some("")));
+        assert!(tracks_stock(Some("шт")));
+        assert!(tracks_stock(Some(" шт ")));
+        assert!(!tracks_stock(Some("м²")));
+        assert!(!tracks_stock(Some("пог. м")));
+        assert!(!tracks_stock(Some("ввод")));
     }
 }

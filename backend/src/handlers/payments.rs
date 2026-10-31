@@ -171,11 +171,16 @@ pub async fn yookassa_webhook(
     // already taken, so the order stays paid and the notification flags the shortage.
     let mut shortages = Vec::new();
     for (product_id, title, quantity) in &per_product {
-        let stock: Option<i32> =
-            sqlx::query_scalar("SELECT stock FROM products WHERE id = $1 FOR UPDATE")
-                .bind(product_id)
-                .fetch_optional(&mut *tx)
-                .await?;
+        let row: Option<(i32, Option<String>)> = sqlx::query_as(
+            "SELECT COALESCE(stock, 0), unit FROM products WHERE id = $1 FOR UPDATE",
+        )
+        .bind(product_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        // Services (м², пог. м, ввод…) have no stock to write off.
+        let stock = row
+            .filter(|(_, unit)| crate::services::checkout::tracks_stock(unit.as_deref()))
+            .map(|(stock, _)| stock);
         if let Some(stock) = stock {
             if (stock as i64) < *quantity {
                 shortages.push(format!(
