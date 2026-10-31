@@ -172,9 +172,11 @@ function openModal(overlay, focusTarget) {
     if (target) target.focus({ preventScroll: true });
 }
 
-function closeModal({ restoreFocus = true } = {}) {
+function closeModal({ restoreFocus = true, force = false } = {}) {
     const overlay = modalState.current;
     if (!overlay) return;
+    // Keep the product form open while it is saving, so a late error is not lost
+    if (overlay === productModal && savingProduct && !force) return;
     modalState.current = null;
     overlay.classList.remove('is-open');
     document.body.classList.remove('modal-open');
@@ -358,7 +360,9 @@ const PAGE_NAMES = {
     '/account': 'Личный кабинет',
     '/account.html': 'Личный кабинет',
     '/privacy-policy': 'Политика конфиденциальности',
-    '/privacy-policy.html': 'Политика конфиденциальности'
+    '/privacy-policy.html': 'Политика конфиденциальности',
+    '/product': 'Карточки товаров',
+    '/product.html': 'Карточки товаров'
 };
 
 function productIdFromPath(path) {
@@ -868,11 +872,23 @@ function audienceLabel(discount, short) {
 
 function discountCell(product) {
     const own = productDiscount(product.id);
-    const fromCategory = own ? null : categoryDiscount(product.category);
-    const discount = own || fromCategory;
-    if (!discount) return DASH;
-    const note = fromCategory ? `на категорию, ${audienceLabel(discount, true)}` : audienceLabel(discount, true);
-    return `<span class="nowrap">−${formatPercentBps(discount.percent_bps)}</span><span class="cell-sub">${note}</span>`;
+    const fromCategory = categoryDiscount(product.category);
+    const cell = (bps, everyone, isOwn) => {
+        const scope = everyone ? 'всем' : 'зарегистрированным';
+        return `<span class="nowrap">−${formatPercentBps(bps)}</span><span class="cell-sub">${isOwn ? scope : `на категорию, ${scope}`}</span>`;
+    };
+    // GET /api/admin/products already reports the discount the shop applies.
+    const reported = Number(product.discount_percent_bps);
+    if (reported > 0) {
+        const everyone = product.discount_registered_only === false;
+        const isOwn = !!own && own.percent_bps === reported && (own.is_registered_only === false) === everyone;
+        return cell(reported, everyone, isOwn);
+    }
+    // Older API: same rule as the backend — discounts for everyone first, then the biggest.
+    const best = [own, fromCategory].filter(Boolean).sort((a, b) =>
+        (Number(b.is_registered_only === false) - Number(a.is_registered_only === false)) || (b.percent_bps - a.percent_bps))[0];
+    if (!best) return DASH;
+    return cell(best.percent_bps, best.is_registered_only === false, best === own);
 }
 
 function priceCell(product) {
@@ -1138,7 +1154,7 @@ productForm.addEventListener('submit', async event => {
         }
         step = wasEditing ? 'Товар сохранён, но скидка не применилась: ' : 'Товар создан, но скидка не применилась: ';
         await syncProductDiscount(productId, values.discount);
-        closeModal();
+        closeModal({ force: true });
         toast(wasEditing ? 'Товар сохранён' : 'Товар создан');
         loadProducts();
     } catch (err) {
