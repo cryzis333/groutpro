@@ -391,6 +391,7 @@
 
     const recalc = () => {
       let total = 0;
+      let quote = false; // выбрана хотя бы одна позиция «по запросу»
       priceList.forEach((item, i) => {
         const row = document.getElementById('estimate-row-' + i);
         if (!row) return;
@@ -399,10 +400,17 @@
         row.classList.toggle('is-on', on);
         const sumEl = row.querySelector('.estimate-item-sum');
         if (sumEl) sumEl.textContent = on ? (sum > 0 ? rub(sum) : 'по запросу') : '';
-        if (on) total += sum;
+        if (on && sum > 0) total += sum;
+        if (on && !(sum > 0)) quote = true;
       });
-      document.getElementById('estimate-works').textContent = rub(total);
-      document.getElementById('estimate-total').textContent = rub(total);
+      // Только позиции «по запросу» — показываем «по запросу», а не «0 ₽»
+      const quoteOnly = total === 0 && quote;
+      const totalText = quoteOnly ? 'по запросу' : rub(total);
+      document.getElementById('estimate-works').textContent = totalText;
+      document.getElementById('estimate-total').textContent = totalText;
+      const totalLabel = document.querySelector('.estimate-row--total span');
+      if (totalLabel) totalLabel.textContent = quoteOnly ? 'Стоимость' : 'Ориентировочно от';
+      estimateBox.dataset.total = String(total);
     };
 
     fetch('/api/products?page_size=50')
@@ -445,7 +453,7 @@
       estimateStatus.classList.remove('is-error', 'is-success');
       // Работы человека может не быть в списке — форму всё равно открываем
       document.getElementById('estimate-chosen').textContent = chosen.length
-        ? `· ${chosen.length} ${plural(chosen.length, 'позиция', 'позиции', 'позиций')}, ориентировочно от ${document.getElementById('estimate-total').textContent}`
+        ? `· ${chosen.length} ${plural(chosen.length, 'позиция', 'позиции', 'позиций')}, ${Number(estimateBox.dataset.total) > 0 ? 'ориентировочно от ' + rub(Number(estimateBox.dataset.total)) : 'стоимость по запросу'}`
         : '· опишите задачу, подберём работы и посчитаем сами';
       estimateForm.hidden = false;
       await fillContactFields({
