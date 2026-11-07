@@ -374,8 +374,7 @@ body.modal-open { overflow: hidden; }
 /* Мелкие подписи — не меньше 12px */
 .leads-badge { min-width: 22px; height: 22px; font-size: 0.75rem; }
 .lead-source,
-.lead-badge,
-.order-invoice { font-size: 0.75rem; }
+.lead-badge { font-size: 0.75rem; }
 
 .admin-badge {
   display: inline-flex;
