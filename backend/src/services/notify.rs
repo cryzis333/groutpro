@@ -34,23 +34,44 @@ impl Notification {
         text
     }
 
-    /// Applies the NOTIFY_PERSONAL_DATA setting (see `personal`).
+    /// Applies the NOTIFY_PERSONAL_DATA setting (see `personal`) and drops the
+    /// `#section` part of the admin link. Yandex's outgoing spam filter rejected
+    /// every short notification that linked to `/admin#leads` and delivered the
+    /// same text linking to `/admin` (tested 10.11.2026), so the section is named
+    /// in words instead.
     pub fn prepare(mut self, include_personal: bool) -> Self {
+        let section = self.link.as_mut().and_then(|link| {
+            let hash = link.find('#')?;
+            let section = admin_section(&link[hash + 1..]);
+            link.truncate(hash);
+            section
+        });
         if include_personal {
             let mut fields = std::mem::take(&mut self.personal);
             fields.append(&mut self.fields);
             self.fields = fields;
         } else {
             if !self.personal.is_empty() {
-                self.fields.push((
-                    "Подробности",
-                    "в админке — персональные данные в уведомления не передаются".to_string(),
-                ));
+                let place = match section {
+                    Some(name) => format!("в админке сайта, раздел «{name}»"),
+                    None => "в админке сайта".to_string(),
+                };
+                self.fields.push(("Подробности", place));
             }
             self.personal.clear();
             self.reply_to = None;
         }
         self
+    }
+}
+
+/// Admin panel sections that notification links point to (`/admin#leads` etc.).
+fn admin_section(fragment: &str) -> Option<&'static str> {
+    match fragment {
+        "leads" => Some("Заявки"),
+        "orders" => Some("Заказы"),
+        "reviews" => Some("Отзывы"),
+        _ => None,
     }
 }
 
@@ -193,8 +214,21 @@ mod tests {
         assert!(n.personal.is_empty());
         assert_eq!(n.reply_to, None);
         assert!(text.contains("Ориентировочно: 12500.00 ₽"));
-        assert!(text.contains("Подробности: в админке"));
-        assert!(text.ends_with("https://example.ru/admin#leads"));
+        assert!(text.contains("\nПодробности: в админке сайта, раздел «Заявки»\n"), "{text}");
+        assert!(text.ends_with("\n\nhttps://example.ru/admin"), "{text}");
+    }
+
+    #[test]
+    fn link_loses_its_fragment() {
+        let mut n = lead();
+        n.link = Some("https://example.ru/admin#unknown".to_string());
+        let n = n.prepare(false);
+        assert_eq!(n.link.as_deref(), Some("https://example.ru/admin"));
+        assert!(n.plain_text().contains("\nПодробности: в админке сайта\n"));
+
+        let mut n = lead();
+        n.link = Some("https://example.ru/".to_string());
+        assert_eq!(n.prepare(true).link.as_deref(), Some("https://example.ru/"));
     }
 
     #[test]
@@ -204,6 +238,7 @@ mod tests {
         assert_eq!(labels, ["Имя", "Телефон", "Задача", "Ориентировочно"]);
         assert!(n.personal.is_empty());
         assert_eq!(n.reply_to.as_deref(), Some("ivan@example.ru"));
+        assert_eq!(n.link.as_deref(), Some("https://example.ru/admin"));
     }
 
     #[test]
