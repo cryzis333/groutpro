@@ -193,6 +193,7 @@ mod tests {
         Notification {
             title: "📩 Новая заявка с сайта".to_string(),
             fields,
+            personal: Vec::new(),
             link: Some("https://example.ru/admin#leads".to_string()),
             reply_to: None,
         }

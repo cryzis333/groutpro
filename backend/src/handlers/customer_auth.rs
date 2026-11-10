@@ -45,7 +45,7 @@ pub async fn register(
     }
     if !req.consent {
         return Err(AppError::Validation(
-            "Подтвердите согласие с политикой конфиденциальности".to_string(),
+            "Подтвердите согласие на обработку персональных данных".to_string(),
         ));
     }
 

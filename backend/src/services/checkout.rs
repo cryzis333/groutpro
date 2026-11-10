@@ -241,7 +241,7 @@ fn validate_order_request(req: &CreateOrderRequest) -> Result<(), AppError> {
     }
     if !req.consent {
         return Err(AppError::Validation(
-            "Подтвердите согласие с политикой конфиденциальности".to_string(),
+            "Подтвердите согласие на обработку персональных данных".to_string(),
         ));
     }
     if req.customer_name.trim().len() < 2 || req.customer_name.trim().len() > 120 {

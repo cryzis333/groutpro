@@ -25,7 +25,7 @@ pub async fn create_review(
     }
     if !req.consent {
         return Err(AppError::Validation(
-            "Подтвердите согласие с политикой конфиденциальности".to_string(),
+            "Подтвердите согласие на обработку персональных данных".to_string(),
         ));
     }
     let kind = if req.kind.as_deref() == Some("suggestion") {
@@ -85,19 +85,21 @@ pub async fn create_review(
     } else {
         "⭐ Новый отзыв с сайта"
     };
-    let mut fields = vec![("Имя", saved.author_name.clone())];
+    let mut personal = vec![("Имя", saved.author_name.clone())];
+    if let Some(contact) = &saved.contact {
+        personal.push(("Контакт", contact.clone()));
+    }
+    personal.push(("Текст", saved.message.clone()));
+    let mut fields = Vec::new();
     if let Some(rating) = saved.rating {
         fields.push(("Оценка", format!("{rating} из 5")));
     }
-    if let Some(contact) = &saved.contact {
-        fields.push(("Контакт", contact.clone()));
-    }
-    fields.push(("Текст", saved.message.clone()));
     Notifier::spawn(
         &state.config,
         Notification {
             title: title.to_string(),
             fields,
+            personal,
             link: state
                 .config
                 .site_url

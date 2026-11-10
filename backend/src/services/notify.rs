@@ -6,7 +6,15 @@ use crate::services::{email::EmailService, max::MaxService, telegram::TelegramSe
 pub struct Notification {
     pub title: String,
     pub fields: Vec<(&'static str, String)>,
+    /// The customer's personal data: name, phone, email, address, company/INN and
+    /// free text. Renderers never read it: `Notifier::spawn` either moves it in
+    /// front of `fields` (NOTIFY_PERSONAL_DATA on) or drops it together with
+    /// `reply_to`. Off by default: mailboxes and messengers may sit on servers
+    /// abroad, and sending customers' data there is a cross-border transfer under
+    /// 152-ФЗ. The admin panel behind `link` always has the full record.
+    pub personal: Vec<(&'static str, String)>,
     pub link: Option<String>,
+    /// The customer's email, so a reply goes straight to them. Personal data too.
     pub reply_to: Option<String>,
 }
 
@@ -24,6 +32,25 @@ impl Notification {
             text.push_str(&format!("\n\n{link}"));
         }
         text
+    }
+
+    /// Applies the NOTIFY_PERSONAL_DATA setting (see `personal`).
+    pub fn prepare(mut self, include_personal: bool) -> Self {
+        if include_personal {
+            let mut fields = std::mem::take(&mut self.personal);
+            fields.append(&mut self.fields);
+            self.fields = fields;
+        } else {
+            if !self.personal.is_empty() {
+                self.fields.push((
+                    "Подробности",
+                    "в админке — персональные данные в уведомления не передаются".to_string(),
+                ));
+            }
+            self.personal.clear();
+            self.reply_to = None;
+        }
+        self
     }
 }
 
@@ -57,6 +84,7 @@ impl Notifier {
     /// Fire-and-forget delivery so a slow SMTP server never delays the HTTP response.
     pub fn spawn(config: &Config, notification: Notification) {
         let notifier = Self::new(config);
+        let notification = notification.prepare(config.notify_personal_data);
         tokio::spawn(async move {
             for (channel, result) in notifier.send(&notification).await {
                 if let Err(error) = result {
@@ -77,6 +105,7 @@ pub async fn cli_self_test() -> anyhow::Result<()> {
             "Статус",
             "уведомления о заявках и заказах настроены".to_string(),
         )],
+        personal: Vec::new(),
         link: config.site_url.clone(),
         reply_to: None,
     };
@@ -134,4 +163,54 @@ pub fn escape_html(input: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Notification;
+
+    fn lead() -> Notification {
+        Notification {
+            title: "📐 Заявка на замер по смете".to_string(),
+            fields: vec![("Ориентировочно", "12500.00 ₽".to_string())],
+            personal: vec![
+                ("Имя", "Иван Петров".to_string()),
+                ("Телефон", "+7 900 123-45-67".to_string()),
+                ("Задача", "ул. Садовая, 5 — течёт подвал".to_string()),
+            ],
+            link: Some("https://example.ru/admin#leads".to_string()),
+            reply_to: Some("ivan@example.ru".to_string()),
+        }
+    }
+
+    #[test]
+    fn personal_data_is_left_out_by_default() {
+        let n = lead().prepare(false);
+        let text = n.plain_text();
+        for secret in ["Иван", "900 123", "Садовая", "ivan@"] {
+            assert!(!text.contains(secret), "{secret} leaked into: {text}");
+        }
+        assert!(n.personal.is_empty());
+        assert_eq!(n.reply_to, None);
+        assert!(text.contains("Ориентировочно: 12500.00 ₽"));
+        assert!(text.contains("Подробности: в админке"));
+        assert!(text.ends_with("https://example.ru/admin#leads"));
+    }
+
+    #[test]
+    fn personal_data_goes_first_when_allowed() {
+        let n = lead().prepare(true);
+        let labels: Vec<_> = n.fields.iter().map(|(label, _)| *label).collect();
+        assert_eq!(labels, ["Имя", "Телефон", "Задача", "Ориентировочно"]);
+        assert!(n.personal.is_empty());
+        assert_eq!(n.reply_to.as_deref(), Some("ivan@example.ru"));
+    }
+
+    #[test]
+    fn no_details_note_without_personal_data() {
+        let mut n = lead();
+        n.personal.clear();
+        let n = n.prepare(false);
+        assert_eq!(n.fields.len(), 1);
+    }
 }

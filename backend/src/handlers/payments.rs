@@ -210,21 +210,23 @@ pub async fn yookassa_webhook(
         })
         .collect::<Vec<_>>()
         .join("\n");
-    let mut fields = vec![
+    let mut personal = vec![
         ("Клиент", order.customer_name.clone()),
         ("Телефон", order.customer_phone.clone()),
     ];
     if let Some(email) = &order.customer_email {
-        fields.push(("Email", email.clone()));
+        personal.push(("Email", email.clone()));
     }
     if let Some(address) = &order.customer_address {
-        fields.push(("Адрес", address.clone()));
+        personal.push(("Адрес", address.clone()));
     }
-    fields.push((
-        "Сумма",
-        format!("{:.2} ₽", order.total_amount as f64 / 100.0),
-    ));
-    fields.push(("Товары", format!("{items_str}\n")));
+    let mut fields = vec![
+        (
+            "Сумма",
+            format!("{:.2} ₽", order.total_amount as f64 / 100.0),
+        ),
+        ("Товары", format!("{items_str}\n")),
+    ];
     let title = if shortages.is_empty() {
         format!("🛒 Оплачен заказ {}", order.public_number)
     } else {
@@ -245,6 +247,7 @@ pub async fn yookassa_webhook(
         Notification {
             title,
             fields,
+            personal,
             link: state
                 .config
                 .site_url
@@ -307,25 +310,29 @@ pub async fn create_invoice_order(
         })
         .collect::<Vec<_>>()
         .join("\n");
-    let mut fields = vec![
+    // Название и ИНН индивидуального предпринимателя — его персональные данные.
+    let mut personal = vec![
         ("Организация", company.to_string()),
         ("ИНН", inn),
         ("Контактное лицо", order.customer_name.clone()),
         ("Телефон", order.customer_phone.clone()),
     ];
     if let Some(email) = &order.customer_email {
-        fields.push(("Email", email.clone()));
+        personal.push(("Email", email.clone()));
     }
-    fields.push((
-        "Сумма",
-        format!("{:.2} ₽", order.total_amount as f64 / 100.0),
-    ));
-    fields.push(("Товары", format!("{items_str}\n")));
+    let fields = vec![
+        (
+            "Сумма",
+            format!("{:.2} ₽", order.total_amount as f64 / 100.0),
+        ),
+        ("Товары", format!("{items_str}\n")),
+    ];
     Notifier::spawn(
         &state.config,
         Notification {
             title: format!("🧾 Запрос счёта {} (юрлицо)", order.public_number),
             fields,
+            personal,
             link: state
                 .config
                 .site_url

@@ -78,7 +78,7 @@ pub async fn create_contact_request(
     }
     if !req.consent {
         return Err(AppError::Validation(
-            "Подтвердите согласие с политикой конфиденциальности".to_string(),
+            "Подтвердите согласие на обработку персональных данных".to_string(),
         ));
     }
 
@@ -157,14 +157,16 @@ pub async fn create_contact_request(
     .fetch_one(&state.pool)
     .await?;
 
-    let mut fields = vec![
+    let mut personal = vec![
         ("Имя", saved.name.clone()),
         ("Телефон", saved.phone.clone()),
     ];
     if let Some(email) = &saved.email {
-        fields.push(("Email", email.clone()));
+        personal.push(("Email", email.clone()));
     }
-    fields.push(("Задача", saved.message.clone()));
+    // The free text often holds the object's address, so it counts as personal data.
+    personal.push(("Задача", saved.message.clone()));
+    let mut fields = Vec::new();
     let title = match &estimate {
         Some((_, total, lines)) => {
             fields.push(("Смета", format!("{lines}\n")));
@@ -178,6 +180,7 @@ pub async fn create_contact_request(
         Notification {
             title: title.to_string(),
             fields,
+            personal,
             link: state
                 .config
                 .site_url

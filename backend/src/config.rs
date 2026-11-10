@@ -35,6 +35,9 @@ pub struct Config {
     pub smtp_password: String,
     pub smtp_from: String,
     pub admin_email: String,
+    /// NOTIFY_PERSONAL_DATA: put customers' names, phones, emails and messages into
+    /// notifications. Off unless set to 1/true/yes/on — see `Notification::personal`.
+    pub notify_personal_data: bool,
     pub server_host: String,
     pub server_port: u16,
     pub upload_dir: String,
@@ -96,6 +99,12 @@ impl Config {
             }
             Some(_) => {}
         }
+        if self.notify_personal_data {
+            tracing::warn!(
+                "NOTIFY_PERSONAL_DATA is on: customers' personal data goes into notifications; \
+                 every mailbox and messenger that receives them must be hosted in Russia"
+            );
+        }
     }
 
     fn build(get: impl Fn(&str) -> Option<String>) -> anyhow::Result<Self> {
@@ -138,6 +147,7 @@ impl Config {
             smtp_password: or_default("SMTP_PASSWORD"),
             smtp_from: or_default("SMTP_FROM"),
             admin_email: or_default("ADMIN_EMAIL"),
+            notify_personal_data: get("NOTIFY_PERSONAL_DATA").is_some_and(|v| is_truthy(&v)),
             server_host: non_empty(get("SERVER_HOST"))
                 .unwrap_or_else(|| DEFAULT_SERVER_HOST.to_string()),
             server_port,
@@ -155,6 +165,14 @@ fn non_empty(value: Option<String>) -> Option<String> {
     value
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty())
+}
+
+/// `1`, `true`, `yes` or `on` (any case) switch a flag on; anything else is off.
+fn is_truthy(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on"
+    )
 }
 
 /// SITE_URL is glued with paths like `/cart.html`, so a trailing slash would
@@ -205,4 +223,19 @@ pub fn read_env_file(path: &Path) -> io::Result<HashMap<String, String>> {
         vars.insert(key.to_string(), value);
     }
     Ok(vars)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_truthy;
+
+    #[test]
+    fn flag_values() {
+        for on in ["1", "true", "TRUE", " yes ", "On"] {
+            assert!(is_truthy(on), "{on:?} should be on");
+        }
+        for off in ["", "0", "false", "no", "off", "2", "да"] {
+            assert!(!is_truthy(off), "{off:?} should be off");
+        }
+    }
 }
