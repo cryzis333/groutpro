@@ -516,6 +516,7 @@
       const totalLabel = document.querySelector('.estimate-row--total span');
       if (totalLabel) totalLabel.textContent = quoteOnly ? 'Стоимость' : 'Ориентировочно от';
       estimateBox.dataset.total = String(total);
+      if (!estimateForm.hidden) fillEstimateHead();
     };
 
     fetch('/api/products?page_size=50')
@@ -552,15 +553,22 @@
     const estimateStatus = document.getElementById('estimate-status');
     const openBtn = document.getElementById('estimate-request');
 
-    openBtn.addEventListener('click', async () => {
+    // Шапка формы повторяет выбранные работы и, пока форма открыта, следит за галочками
+    const fillEstimateHead = () => {
       const chosen = chosenItems();
-      estimateStatus.textContent = '';
-      estimateStatus.classList.remove('is-error', 'is-success');
       // Работы человека может не быть в списке — форму всё равно открываем
       document.getElementById('estimate-chosen').textContent = chosen.length
         ? `· ${chosen.length} ${plural(chosen.length, 'позиция', 'позиции', 'позиций')}, ${Number(estimateBox.dataset.total) > 0 ? 'ориентировочно от ' + rub(Number(estimateBox.dataset.total)) : 'стоимость по запросу'}`
         : '· опишите задачу, подберём работы и посчитаем сами';
+    };
+
+    openBtn.addEventListener('click', async () => {
+      estimateStatus.textContent = '';
+      estimateStatus.classList.remove('is-error', 'is-success');
+      fillEstimateHead();
       estimateForm.hidden = false;
+      // Пока форма открыта, кнопка не нужна — она вернётся после отправки заявки
+      openBtn.hidden = true;
       await fillContactFields({
         name: 'estimate-name', phone: 'estimate-phone', email: 'estimate-email'
       });
@@ -609,6 +617,7 @@
         rememberContact({ name, phone, email });
         estimateForm.reset();
         estimateForm.hidden = true;
+        openBtn.hidden = false;
         estimateStatus.textContent = 'Заявка на замер принята. Перезвоним и согласуем время выезда.';
         estimateStatus.classList.add('is-success');
       } catch (err) {

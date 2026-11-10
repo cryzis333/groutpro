@@ -2879,6 +2879,7 @@ label.consent-checkbox,
 /* Заявка на замер: своя форма прямо в блоке сметы */
 .estimate-form { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
 .estimate-form[hidden] { display: none; }
+.estimate-summary .btn[hidden] { display: none; }
 .estimate-form-head { margin-bottom: 14px; font-weight: 700; letter-spacing: -0.3px; }
 .estimate-form-head span { display: block; margin-top: 4px; font-size: 0.78rem; font-weight: 500; color: var(--muted); }
 .estimate-form .form-group { margin-bottom: 12px; }
