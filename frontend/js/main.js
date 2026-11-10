@@ -452,6 +452,7 @@
       if (name.length < 2) { setStatus('Укажите, как к вам обращаться', 'error'); field('contact-name').focus(); return; }
       if (phone.replace(/\D/g, '').length < 10) { setStatus('Проверьте номер телефона', 'error'); field('contact-phone').focus(); return; }
       if (email && !field('contact-email').checkValidity()) { setStatus('Проверьте email', 'error'); field('contact-email').focus(); return; }
+      if (!field('contact-consent').checked) { setStatus('Подтвердите согласие на обработку персональных данных', 'error'); field('contact-consent').focus(); return; }
 
       const btn = contactForm.querySelector('button[type="submit"]');
       const originalText = btn.textContent;
@@ -467,7 +468,7 @@
             phone,
             email: email || null,
             message: field('contact-message').value.trim() || null,
-            consent: true,
+            consent: field('contact-consent').checked,
             website: field('contact-website').value
           })
         });

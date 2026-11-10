@@ -475,7 +475,7 @@ async function renderDashboardCharts(seq, revenueSeries, viewsSeries) {
         Chart = await loadChartLibrary();
     } catch (e) {
         if (seq !== dashboardSeq) return;
-        const note = 'График не загрузился (нет доступа к cdn.jsdelivr.net). Цифры выше — актуальные.';
+        const note = 'График не загрузился. Цифры выше — актуальные.';
         setChartState('revenue-chart-box', 'revenue-chart-note', revenueSeries ? note : 'Нет данных о выручке.');
         if (viewsSeries) setChartState('views-chart-box', 'views-chart-note', note);
         return;
